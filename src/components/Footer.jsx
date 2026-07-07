@@ -8,7 +8,7 @@ export default function Footer() {
 
         <p>
           Carinho em cada detalhe
-          para você e seu bebê.
+          para você e seu amor.
         </p>
 
         <small>

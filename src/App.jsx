@@ -1,25 +1,13 @@
 import {
   Routes,
-  Route
+  Route,
 } from "react-router-dom";
 
-import Header
-  from "./components/Header";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
 
-import Footer
-  from "./components/Footer";
-
-import Home
-  from "./pages/Home";
-
-import Checkout
-  from "./pages/Checkout";
-
-import Success
-  from "./pages/Success";
-
-import Cancel
-  from "./pages/Cancel";
+import Home from "./pages/Home";
+import Wedding from "./pages/Wedding";
 
 import "./App.css";
 
@@ -28,27 +16,19 @@ export default function App() {
     <div className="app">
       <Header />
 
-      <Routes>
-        <Route
-          path="/"
-          element={<Home />}
-        />
+      <main className="app-content">
+        <Routes>
+          <Route
+            path="/"
+            element={<Home />}
+          />
 
-        <Route
-          path="/checkout"
-          element={<Checkout />}
-        />
-
-        <Route
-          path="/success"
-          element={<Success />}
-        />
-
-        <Route
-          path="/cancel"
-          element={<Cancel />}
-        />
-      </Routes>
+          <Route
+            path="/casamento"
+            element={<Wedding />}
+          />
+        </Routes>
+      </main>
 
       <Footer />
     </div>
