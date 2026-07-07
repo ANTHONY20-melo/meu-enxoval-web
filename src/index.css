@@ -3,9 +3,8 @@
 );
 
 :root {
-  font-family: "DM Sans", sans-serif;
-
-  color: #44383a;
+  font-family: "DM Sans", Arial, sans-serif;
+  color: #4f3e42;
   background: #fffaf8;
 
   font-synthesis: none;
@@ -19,11 +18,25 @@
 }
 
 html {
+  width: 100%;
+  min-height: 100%;
   scroll-behavior: smooth;
 }
 
 body {
+  width: 100%;
   min-width: 320px;
+  min-height: 100vh;
+
+  margin: 0;
+
+  background: #fffaf8;
+
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
   min-height: 100vh;
 }
 
@@ -44,9 +57,4 @@ a {
 img {
   display: block;
   max-width: 100%;
-}
-
-.container {
-  width: min(1120px, calc(100% - 40px));
-  margin-inline: auto;
 }
