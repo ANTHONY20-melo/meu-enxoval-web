@@ -1575,3 +1575,28 @@ body {
     display: none;
   }
 }
+.checklist-error {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+
+  background: #fff0f0;
+  color: #a33c4a;
+
+  border: 1px solid #f2c5cb;
+  border-radius: 12px;
+
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.empty-search {
+  padding: 40px 20px;
+
+  text-align: center;
+  color: #79666a;
+}
+
+.checklist-item:has(input:disabled) {
+  opacity: 0.7;
+  cursor: wait;
+}
