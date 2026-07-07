@@ -92,7 +92,7 @@ export default function Home() {
 
   return (
     <main className="checklist-page">
-      <section className="checklist-hero">
+      <section className="dashboard-section">
         <div className="container">
           <span className="checklist-label">
             💍 Nosso casamento

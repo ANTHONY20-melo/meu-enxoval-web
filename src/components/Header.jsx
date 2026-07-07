@@ -1,14 +1,6 @@
-import {
-  Link
-} from "react-router-dom";
-
-import {
-  useCart
-} from "../hooks/useCart";
+import { Link } from "react-router-dom";
 
 export default function Header() {
-  const { quantity } = useCart();
-
   return (
     <header className="header">
       <div className="container header-content">
@@ -16,24 +8,17 @@ export default function Header() {
           className="logo"
           to="/"
         >
-          Meu Enxoval
+          💍 Nosso Enxoval
         </Link>
 
         <nav className="nav">
-          <Link to="/">
-            Início
-          </Link>
-
-          <a href="/#produtos">
-            Produtos
+          <a href="#checklist">
+            Checklist
           </a>
 
-          <Link
-            className="cart-link"
-            to="/checkout"
-          >
-            Carrinho ({quantity})
-          </Link>
+          <span className="couple-badge">
+            ❤️ Nosso Lar
+          </span>
         </nav>
       </div>
     </header>
