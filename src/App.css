@@ -1600,3 +1600,176 @@ body {
   opacity: 0.7;
   cursor: wait;
 }
+.category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+}
+
+.add-item-button {
+  flex-shrink: 0;
+
+  padding: 9px 13px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #ad6570;
+  color: #ffffff;
+
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.add-item-button:hover {
+  background: #96545f;
+
+  transform: translateY(-1px);
+}
+
+
+.add-item-form {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto
+    auto;
+
+  gap: 8px;
+
+  padding: 12px;
+
+  background: #fff8f6;
+
+  border-bottom:
+    1px solid #eededa;
+}
+
+.add-item-form input {
+  width: 100%;
+  min-width: 0;
+
+  padding: 11px 12px;
+
+  border:
+    1px solid #dec7c3;
+
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #573f44;
+}
+
+.add-item-form input:focus {
+  border-color: #ad6570;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(173, 101, 112, 0.12);
+}
+
+.save-item-button,
+.cancel-item-button {
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 9px;
+
+  cursor: pointer;
+
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.save-item-button {
+  background: #ad6570;
+  color: white;
+}
+
+.cancel-item-button {
+  background: #eee3e1;
+  color: #69565a;
+}
+
+
+.checklist-item-row {
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+}
+
+.checklist-item-row
+.checklist-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-item-button {
+  width: 32px;
+  height: 32px;
+
+  flex: 0 0 32px;
+
+  margin-right: 8px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: transparent;
+  color: #ba747e;
+
+  font-size: 1.3rem;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.delete-item-button:hover {
+  background: #fce8e8;
+  color: #a33c4a;
+}
+
+
+@media (max-width: 600px) {
+  .category-header {
+    align-items: center;
+  }
+
+  .add-item-button {
+    padding: 8px 9px;
+
+    font-size: 0.7rem;
+  }
+
+  .add-item-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .add-item-form input {
+    grid-column: 1 / -1;
+
+    font-size: 16px;
+  }
+
+  .save-item-button,
+  .cancel-item-button {
+    width: 100%;
+  }
+}

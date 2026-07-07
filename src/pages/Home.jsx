@@ -9,6 +9,8 @@ import { checklist } from "../data/checklist";
 import {
   loadChecklist,
   saveChecklistItem,
+  addChecklistItem,
+  deleteChecklistItem,
 } from "../services/checklistService";
 
 import "../App.css";
@@ -24,17 +26,23 @@ export default function Home() {
   const [loading, setLoading] =
     useState(true);
 
-  const [savingItem, setSavingItem] =
-    useState(null);
-
   const [error, setError] =
     useState("");
 
+  const [addingCategory, setAddingCategory] =
+    useState(null);
+
+  const [newItemName, setNewItemName] =
+    useState("");
+
+  const [saving, setSaving] =
+    useState(false);
+
 
   /*
-  ==========================================
-  CARREGAR DADOS DO SUPABASE
-  ==========================================
+  ========================================
+  CARREGAR CHECKLIST
+  ========================================
   */
 
   useEffect(() => {
@@ -43,97 +51,131 @@ export default function Home() {
         setLoading(true);
         setError("");
 
-        const savedItems =
+        const databaseItems =
           await loadChecklist("enxoval");
 
-        if (
-          !savedItems ||
-          savedItems.length === 0
-        ) {
-          return;
-        }
 
-        setCategories(
+        const updatedCategories =
           checklist.map((category) => {
+
+            /*
+            Atualiza os itens padrão
+            */
+
+            const defaultItems =
+              category.items.map((item) => {
+
+                const itemKey =
+                  `enxoval:${category.id}:${item.id}`;
+
+                const savedItem =
+                  databaseItems.find(
+                    (databaseItem) =>
+                      databaseItem.item_key ===
+                      itemKey
+                  );
+
+                return {
+                  ...item,
+
+                  checked:
+                    savedItem
+                      ? savedItem.checked
+                      : item.checked,
+
+                  isCustom: false,
+                };
+              });
+
+
+            /*
+            Busca itens personalizados
+            da categoria
+            */
+
+            const customItems =
+              databaseItems
+                .filter(
+                  (databaseItem) =>
+                    databaseItem.category_id ===
+                      category.id &&
+                    databaseItem.is_custom ===
+                      true
+                )
+                .map((databaseItem) => ({
+                  id:
+                    databaseItem.item_id,
+
+                  name:
+                    databaseItem.item_name,
+
+                  checked:
+                    databaseItem.checked,
+
+                  isCustom: true,
+                }));
+
+
             return {
               ...category,
 
-              items: category.items.map(
-                (item) => {
-                  const itemKey =
-                    `enxoval:${category.id}:${item.id}`;
-
-                  const savedItem =
-                    savedItems.find(
-                      (databaseItem) =>
-                        databaseItem.item_key ===
-                        itemKey
-                    );
-
-                  if (!savedItem) {
-                    return item;
-                  }
-
-                  return {
-                    ...item,
-                    checked:
-                      savedItem.checked,
-                  };
-                }
-              ),
+              items: [
+                ...defaultItems,
+                ...customItems,
+              ],
             };
-          })
+          });
+
+
+        setCategories(
+          updatedCategories
         );
+
       } catch (error) {
-        console.error(
-          "Erro ao carregar checklist:",
-          error
-        );
+        console.error(error);
 
         setError(
-          "Não foi possível carregar os dados salvos."
+          "Não foi possível carregar o checklist."
         );
+
       } finally {
         setLoading(false);
       }
     }
 
+
     loadData();
+
   }, []);
 
 
   /*
-  ==========================================
-  MARCAR OU DESMARCAR ITEM
-  ==========================================
+  ========================================
+  MARCAR ITEM
+  ========================================
   */
 
   async function toggleItem(
     categoryId,
     itemId
   ) {
-    if (savingItem === itemId) {
-      return;
-    }
-
     const category =
       categories.find(
         (category) =>
           category.id === categoryId
       );
 
-    if (!category) {
-      return;
-    }
-
     const currentItem =
-      category.items.find(
-        (item) => item.id === itemId
+      category?.items.find(
+        (item) =>
+          item.id === itemId
       );
+
 
     if (!currentItem) {
       return;
     }
+
 
     const updatedItem = {
       ...currentItem,
@@ -144,18 +186,20 @@ export default function Home() {
 
 
     /*
-    Atualização visual imediata
+    Atualização visual
     */
 
     setCategories(
       (currentCategories) =>
         currentCategories.map(
           (category) => {
+
             if (
               category.id !== categoryId
             ) {
               return category;
             }
+
 
             return {
               ...category,
@@ -173,24 +217,17 @@ export default function Home() {
     );
 
 
-    /*
-    Salvar no Supabase
-    */
-
     try {
-      setSavingItem(itemId);
-      setError("");
-
       await saveChecklistItem({
         listType: "enxoval",
+
         categoryId,
+
         item: updatedItem,
       });
+
     } catch (error) {
-      console.error(
-        "Erro ao salvar item:",
-        error
-      );
+      console.error(error);
 
       setError(
         "Não foi possível salvar a alteração."
@@ -198,19 +235,21 @@ export default function Home() {
 
 
       /*
-      Reverter alteração visual
-      caso o Supabase falhe
+      Reverte se falhar
       */
 
       setCategories(
         (currentCategories) =>
           currentCategories.map(
             (category) => {
+
               if (
-                category.id !== categoryId
+                category.id !==
+                categoryId
               ) {
                 return category;
               }
+
 
               return {
                 ...category,
@@ -226,33 +265,212 @@ export default function Home() {
             }
           )
       );
-    } finally {
-      setSavingItem(null);
     }
   }
 
 
   /*
-  ==========================================
+  ========================================
+  ABRIR FORMULÁRIO
+  ========================================
+  */
+
+  function openAddItem(categoryId) {
+    setAddingCategory(categoryId);
+
+    setNewItemName("");
+
+    setError("");
+  }
+
+
+  /*
+  ========================================
+  CANCELAR
+  ========================================
+  */
+
+  function cancelAddItem() {
+    setAddingCategory(null);
+
+    setNewItemName("");
+  }
+
+
+  /*
+  ========================================
+  ADICIONAR NOVO ITEM
+  ========================================
+  */
+
+  async function handleAddItem(
+    categoryId
+  ) {
+    const name =
+      newItemName.trim();
+
+
+    if (!name) {
+      setError(
+        "Digite o nome do novo item."
+      );
+
+      return;
+    }
+
+
+    try {
+      setSaving(true);
+      setError("");
+
+
+      const newItem =
+        await addChecklistItem({
+          listType: "enxoval",
+
+          categoryId,
+
+          itemName: name,
+        });
+
+
+      setCategories(
+        (currentCategories) =>
+          currentCategories.map(
+            (category) => {
+
+              if (
+                category.id !==
+                categoryId
+              ) {
+                return category;
+              }
+
+
+              return {
+                ...category,
+
+                items: [
+                  ...category.items,
+
+                  newItem,
+                ],
+              };
+            }
+          )
+      );
+
+
+      setNewItemName("");
+
+      setAddingCategory(null);
+
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        "Não foi possível adicionar o item."
+      );
+
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+  /*
+  ========================================
+  EXCLUIR ITEM PERSONALIZADO
+  ========================================
+  */
+
+  async function handleDeleteItem(
+    categoryId,
+    itemId
+  ) {
+    const confirmed =
+      window.confirm(
+        "Deseja excluir este item?"
+      );
+
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    try {
+      await deleteChecklistItem({
+        listType: "enxoval",
+
+        categoryId,
+
+        itemId,
+      });
+
+
+      setCategories(
+        (currentCategories) =>
+          currentCategories.map(
+            (category) => {
+
+              if (
+                category.id !==
+                categoryId
+              ) {
+                return category;
+              }
+
+
+              return {
+                ...category,
+
+                items:
+                  category.items.filter(
+                    (item) =>
+                      item.id !== itemId
+                  ),
+              };
+            }
+          )
+      );
+
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        "Não foi possível excluir o item."
+      );
+    }
+  }
+
+
+  /*
+  ========================================
   ESTATÍSTICAS
-  ==========================================
+  ========================================
   */
 
   const statistics =
     useMemo(() => {
+
       const allItems =
         categories.flatMap(
           (category) =>
             category.items
         );
 
+
       const completed =
         allItems.filter(
-          (item) => item.checked
+          (item) =>
+            item.checked
         ).length;
+
 
       const total =
         allItems.length;
+
 
       const percentage =
         total === 0
@@ -262,30 +480,35 @@ export default function Home() {
                 100
             );
 
+
       return {
         completed,
         total,
         percentage,
       };
+
     }, [categories]);
 
 
   /*
-  ==========================================
+  ========================================
   PESQUISA
-  ==========================================
+  ========================================
   */
 
   const filteredCategories =
     useMemo(() => {
+
       const normalizedSearch =
         search
           .trim()
           .toLowerCase();
 
+
       if (!normalizedSearch) {
         return categories;
       }
+
 
       return categories
         .map((category) => ({
@@ -305,20 +528,24 @@ export default function Home() {
           (category) =>
             category.items.length > 0
         );
+
     }, [categories, search]);
 
 
   /*
-  ==========================================
-  TELA DE CARREGAMENTO
-  ==========================================
+  ========================================
+  LOADING
+  ========================================
   */
 
   if (loading) {
     return (
       <main className="checklist-page">
+
         <section className="checklist-hero">
+
           <div className="container">
+
             <span className="checklist-label">
               💍 Nosso casamento
             </span>
@@ -330,25 +557,30 @@ export default function Home() {
             <p>
               Carregando nosso checklist...
             </p>
+
           </div>
+
         </section>
+
       </main>
     );
   }
 
 
   /*
-  ==========================================
+  ========================================
   INTERFACE
-  ==========================================
+  ========================================
   */
 
   return (
     <main className="checklist-page">
 
+
       {/* HERO */}
 
       <section className="checklist-hero">
+
         <div className="container">
 
           <span className="checklist-label">
@@ -366,19 +598,19 @@ export default function Home() {
           </p>
 
         </div>
+
       </section>
 
 
-      {/* CHECKLIST */}
+      {/* DASHBOARD */}
 
       <section
         className="dashboard-section"
         id="checklist"
       >
+
         <div className="container">
 
-
-          {/* ERRO */}
 
           {error && (
             <div className="checklist-error">
@@ -394,6 +626,7 @@ export default function Home() {
             <div className="progress-header">
 
               <div>
+
                 <span>
                   Progresso geral
                 </span>
@@ -404,7 +637,9 @@ export default function Home() {
                   {statistics.total}
                   {" "}itens
                 </strong>
+
               </div>
+
 
               <div className="progress-percentage">
                 {statistics.percentage}%
@@ -428,7 +663,7 @@ export default function Home() {
           </div>
 
 
-          {/* PESQUISA */}
+          {/* BUSCA */}
 
           <div className="search-container">
 
@@ -438,8 +673,12 @@ export default function Home() {
 
             <input
               type="text"
-              placeholder="Buscar item do enxoval..."
+
+              placeholder=
+                "Buscar item do enxoval..."
+
               value={search}
+
               onChange={(event) =>
                 setSearch(
                   event.target.value
@@ -463,13 +702,16 @@ export default function Home() {
                       item.checked
                   ).length;
 
+
                 return (
                   <section
                     className="category-card"
+
                     key={category.id}
                   >
 
-                    {/* CABEÇALHO DA CATEGORIA */}
+
+                    {/* CABEÇALHO */}
 
                     <header className="category-header">
 
@@ -478,6 +720,7 @@ export default function Home() {
                         <span className="category-icon">
                           {category.icon}
                         </span>
+
 
                         <div>
 
@@ -500,7 +743,95 @@ export default function Home() {
 
                       </div>
 
+
+                      <button
+                        type="button"
+
+                        className="add-item-button"
+
+                        onClick={() =>
+                          openAddItem(
+                            category.id
+                          )
+                        }
+                      >
+                        + Adicionar
+                      </button>
+
                     </header>
+
+
+                    {/* FORMULÁRIO */}
+
+                    {addingCategory ===
+                      category.id && (
+
+                      <div className="add-item-form">
+
+                        <input
+                          type="text"
+
+                          placeholder=
+                            "Ex: Lamparina"
+
+                          value={newItemName}
+
+                          autoFocus
+
+                          onChange={(event) =>
+                            setNewItemName(
+                              event.target.value
+                            )
+                          }
+
+                          onKeyDown={(event) => {
+
+                            if (
+                              event.key ===
+                              "Enter"
+                            ) {
+                              handleAddItem(
+                                category.id
+                              );
+                            }
+
+                          }}
+                        />
+
+
+                        <button
+                          type="button"
+
+                          className="save-item-button"
+
+                          disabled={saving}
+
+                          onClick={() =>
+                            handleAddItem(
+                              category.id
+                            )
+                          }
+                        >
+                          {saving
+                            ? "Salvando..."
+                            : "Adicionar"}
+                        </button>
+
+
+                        <button
+                          type="button"
+
+                          className="cancel-item-button"
+
+                          onClick={
+                            cancelAddItem
+                          }
+                        >
+                          Cancelar
+                        </button>
+
+                      </div>
+                    )}
 
 
                     {/* ITENS */}
@@ -508,30 +839,29 @@ export default function Home() {
                     <div className="checklist-items">
 
                       {category.items.map(
-                        (item) => {
+                        (item) => (
 
-                          const isSaving =
-                            savingItem ===
-                            item.id;
+                          <div
+                            className="checklist-item-row"
 
-                          return (
+                            key={item.id}
+                          >
+
                             <label
                               className={
                                 item.checked
                                   ? "checklist-item checked"
                                   : "checklist-item"
                               }
-                              key={item.id}
                             >
 
                               <input
                                 type="checkbox"
+
                                 checked={
                                   item.checked
                                 }
-                                disabled={
-                                  isSaving
-                                }
+
                                 onChange={() =>
                                   toggleItem(
                                     category.id,
@@ -542,13 +872,9 @@ export default function Home() {
 
 
                               <span className="custom-checkbox">
-
-                                {isSaving
-                                  ? "..."
-                                  : item.checked
-                                    ? "✓"
-                                    : ""}
-
+                                {item.checked
+                                  ? "✓"
+                                  : ""}
                               </span>
 
 
@@ -557,8 +883,32 @@ export default function Home() {
                               </span>
 
                             </label>
-                          );
-                        }
+
+
+                            {item.isCustom && (
+
+                              <button
+                                type="button"
+
+                                className="delete-item-button"
+
+                                title="Excluir item"
+
+                                onClick={() =>
+                                  handleDeleteItem(
+                                    category.id,
+                                    item.id
+                                  )
+                                }
+                              >
+                                ×
+                              </button>
+
+                            )}
+
+                          </div>
+
+                        )
                       )}
 
                     </div>
@@ -570,24 +920,8 @@ export default function Home() {
 
           </div>
 
-
-          {/* PESQUISA SEM RESULTADOS */}
-
-          {filteredCategories.length === 0 && (
-            <div className="empty-search">
-
-              <p>
-                Nenhum item encontrado para
-                {" "}
-                <strong>
-                  "{search}"
-                </strong>.
-              </p>
-
-            </div>
-          )}
-
         </div>
+
       </section>
 
     </main>
