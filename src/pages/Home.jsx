@@ -10,7 +10,7 @@ import {
   loadChecklist,
   saveChecklistItem,
   addChecklistItem,
-  deleteChecklistItem,
+  removeChecklistItem,
 } from "../services/checklistService";
 
 import "../App.css";
@@ -38,6 +38,9 @@ export default function Home() {
   const [saving, setSaving] =
     useState(false);
 
+  const [removingItem, setRemovingItem] =
+    useState(null);
+
 
   /*
   ========================================
@@ -59,38 +62,59 @@ export default function Home() {
           checklist.map((category) => {
 
             /*
-            Atualiza os itens padrão
+            ==================================
+            ITENS PADRÃO
+            ==================================
+
+            Os itens marcados como deleted
+            no banco não serão carregados.
             */
 
             const defaultItems =
-              category.items.map((item) => {
+              category.items
+                .filter((item) => {
+                  const itemKey =
+                    `enxoval:${category.id}:${item.id}`;
 
-                const itemKey =
-                  `enxoval:${category.id}:${item.id}`;
+                  const databaseItem =
+                    databaseItems.find(
+                      (dbItem) =>
+                        dbItem.item_key ===
+                        itemKey
+                    );
 
-                const savedItem =
-                  databaseItems.find(
-                    (databaseItem) =>
-                      databaseItem.item_key ===
-                      itemKey
+                  return (
+                    databaseItem?.deleted !== true
                   );
+                })
+                .map((item) => {
+                  const itemKey =
+                    `enxoval:${category.id}:${item.id}`;
 
-                return {
-                  ...item,
+                  const savedItem =
+                    databaseItems.find(
+                      (databaseItem) =>
+                        databaseItem.item_key ===
+                        itemKey
+                    );
 
-                  checked:
-                    savedItem
-                      ? savedItem.checked
-                      : item.checked,
+                  return {
+                    ...item,
 
-                  isCustom: false,
-                };
-              });
+                    checked:
+                      savedItem
+                        ? savedItem.checked
+                        : item.checked,
+
+                    isCustom: false,
+                  };
+                });
 
 
             /*
-            Busca itens personalizados
-            da categoria
+            ==================================
+            ITENS PERSONALIZADOS
+            ==================================
             */
 
             const customItems =
@@ -100,6 +124,8 @@ export default function Home() {
                     databaseItem.category_id ===
                       category.id &&
                     databaseItem.is_custom ===
+                      true &&
+                    databaseItem.deleted !==
                       true
                 )
                 .map((databaseItem) => ({
@@ -132,7 +158,10 @@ export default function Home() {
         );
 
       } catch (error) {
-        console.error(error);
+        console.error(
+          "Erro ao carregar checklist:",
+          error
+        );
 
         setError(
           "Não foi possível carregar o checklist."
@@ -151,7 +180,7 @@ export default function Home() {
 
   /*
   ========================================
-  MARCAR ITEM
+  MARCAR OU DESMARCAR ITEM
   ========================================
   */
 
@@ -164,6 +193,7 @@ export default function Home() {
         (category) =>
           category.id === categoryId
       );
+
 
     const currentItem =
       category?.items.find(
@@ -186,7 +216,7 @@ export default function Home() {
 
 
     /*
-    Atualização visual
+    Atualização visual imediata
     */
 
     setCategories(
@@ -217,7 +247,14 @@ export default function Home() {
     );
 
 
+    /*
+    Salvar no banco
+    */
+
     try {
+      setError("");
+
+
       await saveChecklistItem({
         listType: "enxoval",
 
@@ -227,7 +264,11 @@ export default function Home() {
       });
 
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao salvar item:",
+        error
+      );
+
 
       setError(
         "Não foi possível salvar a alteração."
@@ -235,7 +276,7 @@ export default function Home() {
 
 
       /*
-      Reverte se falhar
+      Reverter alteração visual
       */
 
       setCategories(
@@ -271,12 +312,14 @@ export default function Home() {
 
   /*
   ========================================
-  ABRIR FORMULÁRIO
+  ABRIR FORMULÁRIO DE NOVO ITEM
   ========================================
   */
 
   function openAddItem(categoryId) {
-    setAddingCategory(categoryId);
+    setAddingCategory(
+      categoryId
+    );
 
     setNewItemName("");
 
@@ -286,7 +329,7 @@ export default function Home() {
 
   /*
   ========================================
-  CANCELAR
+  CANCELAR NOVO ITEM
   ========================================
   */
 
@@ -319,8 +362,14 @@ export default function Home() {
     }
 
 
+    if (saving) {
+      return;
+    }
+
+
     try {
       setSaving(true);
+
       setError("");
 
 
@@ -352,7 +401,6 @@ export default function Home() {
 
                 items: [
                   ...category.items,
-
                   newItem,
                 ],
               };
@@ -366,7 +414,11 @@ export default function Home() {
       setAddingCategory(null);
 
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao adicionar item:",
+        error
+      );
+
 
       setError(
         "Não foi possível adicionar o item."
@@ -380,17 +432,17 @@ export default function Home() {
 
   /*
   ========================================
-  EXCLUIR ITEM PERSONALIZADO
+  REMOVER QUALQUER ITEM
   ========================================
   */
 
-  async function handleDeleteItem(
+  async function handleRemoveItem(
     categoryId,
-    itemId
+    item
   ) {
     const confirmed =
       window.confirm(
-        "Deseja excluir este item?"
+        `Deseja remover "${item.name}" da lista?`
       );
 
 
@@ -399,15 +451,30 @@ export default function Home() {
     }
 
 
+    const removeKey =
+      `${categoryId}:${item.id}`;
+
+
     try {
-      await deleteChecklistItem({
+      setRemovingItem(
+        removeKey
+      );
+
+      setError("");
+
+
+      await removeChecklistItem({
         listType: "enxoval",
 
         categoryId,
 
-        itemId,
+        item,
       });
 
+
+      /*
+      Remove da interface
+      */
 
       setCategories(
         (currentCategories) =>
@@ -427,8 +494,9 @@ export default function Home() {
 
                 items:
                   category.items.filter(
-                    (item) =>
-                      item.id !== itemId
+                    (currentItem) =>
+                      currentItem.id !==
+                      item.id
                   ),
               };
             }
@@ -436,11 +504,18 @@ export default function Home() {
       );
 
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Erro ao remover item:",
+        error
+      );
+
 
       setError(
-        "Não foi possível excluir o item."
+        "Não foi possível remover o item."
       );
+
+    } finally {
+      setRemovingItem(null);
     }
   }
 
@@ -612,10 +687,27 @@ export default function Home() {
         <div className="container">
 
 
+          {/* MENSAGEM DE ERRO */}
+
           {error && (
+
             <div className="checklist-error">
-              {error}
+
+              <span>
+                {error}
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setError("")
+                }
+              >
+                ×
+              </button>
+
             </div>
+
           )}
 
 
@@ -642,7 +734,9 @@ export default function Home() {
 
 
               <div className="progress-percentage">
+
                 {statistics.percentage}%
+
               </div>
 
             </div>
@@ -652,6 +746,7 @@ export default function Home() {
 
               <div
                 className="progress-fill"
+
                 style={{
                   width:
                     `${statistics.percentage}%`,
@@ -663,7 +758,7 @@ export default function Home() {
           </div>
 
 
-          {/* BUSCA */}
+          {/* PESQUISA */}
 
           <div className="search-container">
 
@@ -674,8 +769,7 @@ export default function Home() {
             <input
               type="text"
 
-              placeholder=
-                "Buscar item do enxoval..."
+              placeholder="Buscar item do enxoval..."
 
               value={search}
 
@@ -704,9 +798,9 @@ export default function Home() {
 
 
                 return (
+
                   <section
                     className="category-card"
-
                     key={category.id}
                   >
 
@@ -761,7 +855,7 @@ export default function Home() {
                     </header>
 
 
-                    {/* FORMULÁRIO */}
+                    {/* FORMULÁRIO DE ADIÇÃO */}
 
                     {addingCategory ===
                       category.id && (
@@ -771,10 +865,11 @@ export default function Home() {
                         <input
                           type="text"
 
-                          placeholder=
-                            "Ex: Lamparina"
+                          placeholder="Ex: Lamparina"
 
-                          value={newItemName}
+                          value={
+                            newItemName
+                          }
 
                           autoFocus
 
@@ -788,11 +883,20 @@ export default function Home() {
 
                             if (
                               event.key ===
-                              "Enter"
+                                "Enter" &&
+                              !saving
                             ) {
                               handleAddItem(
                                 category.id
                               );
+                            }
+
+
+                            if (
+                              event.key ===
+                              "Escape"
+                            ) {
+                              cancelAddItem();
                             }
 
                           }}
@@ -812,9 +916,11 @@ export default function Home() {
                             )
                           }
                         >
+
                           {saving
                             ? "Salvando..."
                             : "Adicionar"}
+
                         </button>
 
 
@@ -822,6 +928,8 @@ export default function Home() {
                           type="button"
 
                           className="cancel-item-button"
+
+                          disabled={saving}
 
                           onClick={
                             cancelAddItem
@@ -831,94 +939,178 @@ export default function Home() {
                         </button>
 
                       </div>
+
                     )}
 
 
-                    {/* ITENS */}
+                    {/* LISTA DE ITENS */}
 
                     <div className="checklist-items">
 
                       {category.items.map(
-                        (item) => (
+                        (item) => {
 
-                          <div
-                            className="checklist-item-row"
+                          const removeKey =
+                            `${category.id}:${item.id}`;
 
-                            key={item.id}
-                          >
+                          const isRemoving =
+                            removingItem ===
+                            removeKey;
 
-                            <label
-                              className={
-                                item.checked
-                                  ? "checklist-item checked"
-                                  : "checklist-item"
-                              }
+
+                          return (
+
+                            <div
+                              className="checklist-item-row"
+                              key={item.id}
                             >
 
-                              <input
-                                type="checkbox"
 
-                                checked={
+                              {/* CHECKBOX */}
+
+                              <label
+                                className={
                                   item.checked
+                                    ? "checklist-item checked"
+                                    : "checklist-item"
                                 }
+                              >
 
-                                onChange={() =>
-                                  toggleItem(
-                                    category.id,
-                                    item.id
-                                  )
-                                }
-                              />
+                                <input
+                                  type="checkbox"
 
+                                  checked={
+                                    item.checked
+                                  }
 
-                              <span className="custom-checkbox">
-                                {item.checked
-                                  ? "✓"
-                                  : ""}
-                              </span>
+                                  disabled={
+                                    isRemoving
+                                  }
 
-
-                              <span className="item-name">
-                                {item.name}
-                              </span>
-
-                            </label>
+                                  onChange={() =>
+                                    toggleItem(
+                                      category.id,
+                                      item.id
+                                    )
+                                  }
+                                />
 
 
-                            {item.isCustom && (
+                                <span className="custom-checkbox">
+
+                                  {item.checked
+                                    ? "✓"
+                                    : ""}
+
+                                </span>
+
+
+                                <span className="item-name">
+
+                                  {item.name}
+
+                                </span>
+
+                              </label>
+
+
+                              {/* REMOVER QUALQUER ITEM */}
 
                               <button
                                 type="button"
 
                                 className="delete-item-button"
 
-                                title="Excluir item"
+                                title={
+                                  `Remover ${item.name}`
+                                }
+
+                                aria-label={
+                                  `Remover ${item.name}`
+                                }
+
+                                disabled={
+                                  isRemoving
+                                }
 
                                 onClick={() =>
-                                  handleDeleteItem(
+                                  handleRemoveItem(
                                     category.id,
-                                    item.id
+                                    item
                                   )
                                 }
                               >
-                                ×
+
+                                {isRemoving
+                                  ? "..."
+                                  : "🗑️"}
+
                               </button>
 
-                            )}
+                            </div>
 
-                          </div>
-
-                        )
+                          );
+                        }
                       )}
 
                     </div>
 
+
+                    {/* CATEGORIA VAZIA */}
+
+                    {category.items.length ===
+                      0 && (
+
+                      <div className="empty-category">
+
+                        <p>
+                          Nenhum item nesta categoria.
+                        </p>
+
+                        <button
+                          type="button"
+
+                          onClick={() =>
+                            openAddItem(
+                              category.id
+                            )
+                          }
+                        >
+                          + Adicionar primeiro item
+                        </button>
+
+                      </div>
+
+                    )}
+
                   </section>
+
                 );
               }
             )}
 
           </div>
+
+
+          {/* BUSCA SEM RESULTADO */}
+
+          {filteredCategories.length ===
+            0 && (
+
+            <div className="empty-search">
+
+              <p>
+                Nenhum item encontrado para{" "}
+
+                <strong>
+                  "{search}"
+                </strong>.
+
+              </p>
+
+            </div>
+
+          )}
 
         </div>
 

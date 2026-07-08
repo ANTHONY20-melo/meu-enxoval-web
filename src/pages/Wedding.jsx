@@ -12,7 +12,7 @@ import {
   loadChecklist,
   saveChecklistItem,
   addChecklistItem,
-  deleteChecklistItem,
+  removeChecklistItem,
 } from "../services/checklistService";
 
 import "../App.css";
@@ -44,10 +44,15 @@ export default function Wedding() {
   const [saving, setSaving] =
     useState(false);
 
+  const [
+    removingItem,
+    setRemovingItem,
+  ] = useState(null);
+
 
   /*
   ========================================
-  CARREGAR DADOS DO SUPABASE
+  CARREGAR CHECKLIST DO CASAMENTO
   ========================================
   */
 
@@ -67,16 +72,42 @@ export default function Wedding() {
           weddingChecklist.map(
             (category) => {
 
+
               /*
+              ==================================
               ITENS PADRÃO
+              ==================================
+
+              Se deleted = true,
+              o item não será exibido.
               */
 
               const defaultItems =
-                category.items.map(
-                  (item) => {
+                category.items
+                  .filter((item) => {
 
                     const itemKey =
                       `casamento:${category.id}:${item.id}`;
+
+
+                    const databaseItem =
+                      databaseItems.find(
+                        (dbItem) =>
+                          dbItem.item_key ===
+                          itemKey
+                      );
+
+
+                    return (
+                      databaseItem?.deleted !==
+                      true
+                    );
+                  })
+                  .map((item) => {
+
+                    const itemKey =
+                      `casamento:${category.id}:${item.id}`;
+
 
                     const savedItem =
                       databaseItems.find(
@@ -96,12 +127,13 @@ export default function Wedding() {
 
                       isCustom: false,
                     };
-                  }
-                );
+                  });
 
 
               /*
+              ==================================
               ITENS PERSONALIZADOS
+              ==================================
               */
 
               const customItems =
@@ -110,7 +142,11 @@ export default function Wedding() {
                     (databaseItem) =>
                       databaseItem.category_id ===
                         category.id &&
+
                       databaseItem.is_custom ===
+                        true &&
+
+                      databaseItem.deleted !==
                         true
                   )
                   .map(
@@ -147,9 +183,10 @@ export default function Wedding() {
 
       } catch (error) {
         console.error(
-          "Erro carregando casamento:",
+          "Erro ao carregar casamento:",
           error
         );
+
 
         setError(
           "Não foi possível carregar o checklist do casamento."
@@ -168,7 +205,7 @@ export default function Wedding() {
 
   /*
   ========================================
-  MARCAR / DESMARCAR ITEM
+  MARCAR OU DESMARCAR ITEM
   ========================================
   */
 
@@ -213,7 +250,8 @@ export default function Wedding() {
           (category) => {
 
             if (
-              category.id !== categoryId
+              category.id !==
+              categoryId
             ) {
               return category;
             }
@@ -253,7 +291,7 @@ export default function Wedding() {
 
     } catch (error) {
       console.error(
-        "Erro salvando item:",
+        "Erro ao salvar item:",
         error
       );
 
@@ -264,7 +302,7 @@ export default function Wedding() {
 
 
       /*
-      REVERTER SE HOUVER ERRO
+      REVERTER ALTERAÇÃO
       */
 
       setCategories(
@@ -332,7 +370,7 @@ export default function Wedding() {
 
   /*
   ========================================
-  ADICIONAR ITEM PERSONALIZADO
+  ADICIONAR ITEM
   ========================================
   */
 
@@ -352,6 +390,11 @@ export default function Wedding() {
     }
 
 
+    if (saving) {
+      return;
+    }
+
+
     try {
       setSaving(true);
 
@@ -360,8 +403,7 @@ export default function Wedding() {
 
       const newItem =
         await addChecklistItem({
-          listType:
-            "casamento",
+          listType: "casamento",
 
           categoryId,
 
@@ -401,7 +443,7 @@ export default function Wedding() {
 
     } catch (error) {
       console.error(
-        "Erro adicionando item:",
+        "Erro ao adicionar item:",
         error
       );
 
@@ -418,17 +460,17 @@ export default function Wedding() {
 
   /*
   ========================================
-  EXCLUIR ITEM PERSONALIZADO
+  REMOVER QUALQUER ITEM
   ========================================
   */
 
-  async function handleDeleteItem(
+  async function handleRemoveItem(
     categoryId,
-    itemId
+    item
   ) {
     const confirmed =
       window.confirm(
-        "Deseja realmente excluir este item?"
+        `Deseja remover "${item.name}" da lista?`
       );
 
 
@@ -437,19 +479,30 @@ export default function Wedding() {
     }
 
 
+    const removeKey =
+      `${categoryId}:${item.id}`;
+
+
     try {
+      setRemovingItem(
+        removeKey
+      );
+
       setError("");
 
 
-      await deleteChecklistItem({
-        listType:
-          "casamento",
+      await removeChecklistItem({
+        listType: "casamento",
 
         categoryId,
 
-        itemId,
+        item,
       });
 
+
+      /*
+      REMOVE DA INTERFACE
+      */
 
       setCategories(
         (currentCategories) =>
@@ -469,9 +522,9 @@ export default function Wedding() {
 
                 items:
                   category.items.filter(
-                    (item) =>
-                      item.id !==
-                      itemId
+                    (currentItem) =>
+                      currentItem.id !==
+                      item.id
                   ),
               };
             }
@@ -480,14 +533,17 @@ export default function Wedding() {
 
     } catch (error) {
       console.error(
-        "Erro excluindo item:",
+        "Erro ao remover item:",
         error
       );
 
 
       setError(
-        "Não foi possível excluir o item."
+        "Não foi possível remover o item."
       );
+
+    } finally {
+      setRemovingItem(null);
     }
   }
 
@@ -539,7 +595,7 @@ export default function Wedding() {
 
   /*
   ========================================
-  FILTRO DE PESQUISA
+  PESQUISA
   ========================================
   */
 
@@ -575,8 +631,7 @@ export default function Wedding() {
         )
         .filter(
           (category) =>
-            category.items.length >
-            0
+            category.items.length > 0
         );
 
     }, [categories, search]);
@@ -669,9 +724,26 @@ export default function Wedding() {
           {/* ERRO */}
 
           {error && (
+
             <div className="checklist-error">
-              {error}
+
+              <span>
+                {error}
+              </span>
+
+
+              <button
+                type="button"
+
+                onClick={() =>
+                  setError("")
+                }
+              >
+                ×
+              </button>
+
             </div>
+
           )}
 
 
@@ -735,8 +807,7 @@ export default function Wedding() {
             <input
               type="text"
 
-              placeholder=
-                "Buscar item do casamento..."
+              placeholder="Buscar item do casamento..."
 
               value={search}
 
@@ -765,6 +836,7 @@ export default function Wedding() {
 
 
                 return (
+
                   <section
                     className="category-card"
 
@@ -813,7 +885,7 @@ export default function Wedding() {
                       </div>
 
 
-                      {/* BOTÃO ADICIONAR */}
+                      {/* ADICIONAR */}
 
                       <button
                         type="button"
@@ -834,7 +906,7 @@ export default function Wedding() {
                     </header>
 
 
-                    {/* FORMULÁRIO NOVO ITEM */}
+                    {/* FORMULÁRIO */}
 
                     {addingCategory ===
                       category.id && (
@@ -844,8 +916,7 @@ export default function Wedding() {
                         <input
                           type="text"
 
-                          placeholder=
-                            "Digite o novo item..."
+                          placeholder="Digite o novo item..."
 
                           value={
                             newItemName
@@ -853,27 +924,30 @@ export default function Wedding() {
 
                           autoFocus
 
-                          onChange={(
-                            event
-                          ) =>
+                          onChange={(event) =>
                             setNewItemName(
-                              event
-                                .target
-                                .value
+                              event.target.value
                             )
                           }
 
-                          onKeyDown={(
-                            event
-                          ) => {
+                          onKeyDown={(event) => {
 
                             if (
                               event.key ===
-                              "Enter"
+                                "Enter" &&
+                              !saving
                             ) {
                               handleAddItem(
                                 category.id
                               );
+                            }
+
+
+                            if (
+                              event.key ===
+                              "Escape"
+                            ) {
+                              cancelAddItem();
                             }
 
                           }}
@@ -883,12 +957,9 @@ export default function Wedding() {
                         <button
                           type="button"
 
-                          className=
-                            "save-item-button"
+                          className="save-item-button"
 
-                          disabled={
-                            saving
-                          }
+                          disabled={saving}
 
                           onClick={() =>
                             handleAddItem(
@@ -907,8 +978,9 @@ export default function Wedding() {
                         <button
                           type="button"
 
-                          className=
-                            "cancel-item-button"
+                          className="cancel-item-button"
+
+                          disabled={saving}
 
                           onClick={
                             cancelAddItem
@@ -924,101 +996,154 @@ export default function Wedding() {
                     )}
 
 
-                    {/* LISTA */}
+                    {/* ITENS */}
 
                     <div className="checklist-items">
 
                       {category.items.map(
-                        (item) => (
+                        (item) => {
 
-                          <div
-                            className=
-                              "checklist-item-row"
-
-                            key={
-                              item.id
-                            }
-                          >
+                          const removeKey =
+                            `${category.id}:${item.id}`;
 
 
-                            <label
-                              className={
-                                item.checked
-                                  ? "checklist-item checked"
-                                  : "checklist-item"
-                              }
+                          const isRemoving =
+                            removingItem ===
+                            removeKey;
+
+
+                          return (
+
+                            <div
+                              className="checklist-item-row"
+
+                              key={item.id}
                             >
 
 
-                              <input
-                                type="checkbox"
+                              {/* CHECKBOX */}
 
-                                checked={
+                              <label
+                                className={
                                   item.checked
+                                    ? "checklist-item checked"
+                                    : "checklist-item"
                                 }
-
-                                onChange={() =>
-                                  toggleItem(
-                                    category.id,
-                                    item.id
-                                  )
-                                }
-                              />
+                              >
 
 
-                              <span className="custom-checkbox">
+                                <input
+                                  type="checkbox"
 
-                                {item.checked
-                                  ? "✓"
-                                  : ""}
+                                  checked={
+                                    item.checked
+                                  }
 
-                              </span>
+                                  disabled={
+                                    isRemoving
+                                  }
+
+                                  onChange={() =>
+                                    toggleItem(
+                                      category.id,
+                                      item.id
+                                    )
+                                  }
+                                />
 
 
-                              <span className="item-name">
+                                <span className="custom-checkbox">
 
-                                {item.name}
+                                  {item.checked
+                                    ? "✓"
+                                    : ""}
 
-                              </span>
-
-                            </label>
+                                </span>
 
 
-                            {/* EXCLUI APENAS PERSONALIZADOS */}
+                                <span className="item-name">
 
-                            {item.isCustom && (
+                                  {item.name}
+
+                                </span>
+
+                              </label>
+
+
+                              {/* REMOVER QUALQUER ITEM */}
 
                               <button
                                 type="button"
 
-                                className=
-                                  "delete-item-button"
+                                className="delete-item-button"
 
-                                title=
-                                  "Excluir item"
+                                title={
+                                  `Remover ${item.name}`
+                                }
+
+                                aria-label={
+                                  `Remover ${item.name}`
+                                }
+
+                                disabled={
+                                  isRemoving
+                                }
 
                                 onClick={() =>
-                                  handleDeleteItem(
+                                  handleRemoveItem(
                                     category.id,
-                                    item.id
+                                    item
                                   )
                                 }
                               >
 
-                                ×
+                                {isRemoving
+                                  ? "..."
+                                  : "🗑️"}
 
                               </button>
 
-                            )}
+                            </div>
 
-                          </div>
-
-                        )
+                          );
+                        }
                       )}
 
                     </div>
 
+
+                    {/* CATEGORIA VAZIA */}
+
+                    {category.items.length ===
+                      0 && (
+
+                      <div className="empty-category">
+
+                        <p>
+                          Nenhum item nesta categoria.
+                        </p>
+
+
+                        <button
+                          type="button"
+
+                          onClick={() =>
+                            openAddItem(
+                              category.id
+                            )
+                          }
+                        >
+
+                          + Adicionar primeiro item
+
+                        </button>
+
+                      </div>
+
+                    )}
+
                   </section>
+
                 );
               }
             )}
@@ -1026,7 +1151,7 @@ export default function Wedding() {
           </div>
 
 
-          {/* SEM RESULTADOS */}
+          {/* PESQUISA SEM RESULTADO */}
 
           {filteredCategories.length ===
             0 && (
