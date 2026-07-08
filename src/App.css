@@ -1930,3 +1930,131 @@ body {
     opacity: 0.75;
   }
 }
+/* ========================================
+   MENU INFERIOR PARA CELULAR
+======================================== */
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+
+@media screen and (max-width: 768px) {
+  body {
+    padding-bottom: 90px;
+  }
+
+
+  /*
+  ESCONDE O MENU SUPERIOR NO CELULAR
+  */
+
+  .header .nav {
+    display: none !important;
+  }
+
+
+  /*
+  MENU INFERIOR
+  */
+
+  .mobile-bottom-nav {
+    position: fixed;
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+
+    width: auto;
+
+    padding: 7px;
+
+    gap: 6px;
+
+    background:
+      rgba(255, 250, 248, 0.98);
+
+    border:
+      1px solid #ead9d5;
+
+    border-radius: 18px;
+
+    box-shadow:
+      0 8px 30px
+      rgba(87, 63, 68, 0.22);
+
+    z-index: 99999;
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+
+  .mobile-bottom-link {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 0;
+    min-height: 56px;
+
+    gap: 4px;
+
+    padding: 6px;
+
+    border-radius: 13px;
+
+    color: #735f64;
+
+    text-decoration: none;
+
+    font-size: 0.75rem;
+    font-weight: 700;
+
+    transition:
+      background 0.2s ease,
+      color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+
+  .mobile-bottom-link.active {
+    color: #ffffff;
+
+    background:
+      linear-gradient(
+        135deg,
+        #c87883,
+        #ad6570
+      );
+  }
+
+
+  .mobile-bottom-icon {
+    font-size: 1.3rem;
+
+    line-height: 1;
+  }
+
+
+  /*
+  ESPAÇO PARA O MENU NÃO COBRIR CONTEÚDO
+  */
+
+  .app-content {
+    padding-bottom: 20px;
+  }
+
+
+  .footer {
+    margin-bottom: 80px;
+  }
+}
