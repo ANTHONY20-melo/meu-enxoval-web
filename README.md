@@ -1,13 +1,14 @@
 # Meu Enxoval — Web
 
 Frontend do projeto **Meu Enxoval**: planejamento de casamento e enxoval
-com checklist compartilhado, orçamento e checkout com Mercado Pago.
+com lista de presentes (reserva com nome), áreas privadas do casal,
+orçamento e checkout com Mercado Pago.
 
 ## Stack
 
 - React 19 + Vite 6
 - React Router 8
-- Supabase (banco + checklist compartilhado)
+- Supabase (banco, autenticação + RLS)
 - Mercado Pago (checkout, via API)
 
 ## Como rodar
@@ -27,6 +28,24 @@ Copie `.env.example` para `.env` e preencha:
 | `VITE_SUPABASE_URL` | URL do projeto Supabase |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave pública/anônima do Supabase |
 
+## Setup do banco (obrigatório na primeira vez)
+
+O arquivo `supabase/schema.sql` cria as tabelas, funções e políticas
+de segurança (Row Level Security). Execute no SQL Editor do Supabase:
+
+1. Acesse o painel do Supabase → projeto → **SQL Editor**
+2. Cole o conteúdo de `supabase/schema.sql` e clique em **Run**
+3. Crie as contas do casal em **Authentication → Users** (2 e-mails)
+4. Cada membro do casal entra em `/admin` e clica em
+   **"Tornar-me administrador"** (máximo 2)
+
+Com o RLS ativo:
+- **Público**: pode ler a lista e reservar presentes (via funções seguras)
+- **Casal**: pode marcar/adicionar/remover itens, ver orçamento e
+  cancelar reservas
+- **Orçamento e Casamento**: 100% privados (rota `/orcamento` e
+  `/casamento` exigem login do casal)
+
 ## Comandos
 
 ```bash
@@ -41,11 +60,11 @@ npm run lint     # oxlint
 ```
 src/
 ├── components/   # Componentes de interface (Header, ChecklistPage, Cart...)
-├── context/      # Contextos (carrinho de compras)
+├── context/      # Contextos (carrinho, autenticação do casal)
 ├── data/         # Dados padrão (checklists e configurações das páginas)
-├── hooks/        # Hooks de domínio (useChecklist, useCart)
-├── pages/        # Rotas (Dashboard, Enxoval, Casamento, Orçamento, Checkout...)
-└── services/     # Acesso a dados (Supabase, API de checkout)
+├── hooks/        # Hooks de domínio (useChecklist, useGiftReservations, useCart)
+├── pages/        # Rotas (Dashboard, Enxoval, Casamento, Orçamento, Admin...)
+└── services/     # Acesso a dados (Supabase, reservas, API de checkout)
 ```
 
 As páginas de Enxoval e Casamento compartilham o componente `ChecklistPage`,

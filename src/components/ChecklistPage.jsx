@@ -1,33 +1,54 @@
 import {
+  useState,
+} from "react";
+
+import {
   useChecklist
 } from "../hooks/useChecklist";
+
+import {
+  useGiftReservations
+} from "../hooks/useGiftReservations";
+
+import { useAuth }
+  from "../context/AuthContext";
+
+import ReservationModal
+  from "./ReservationModal";
 
 
 /**
  * Página genérica de checklist.
  *
  * Usada pelas rotas /enxoval e /casamento
- * com configurações diferentes, eliminando
- * a duplicação que existia entre Home.jsx
- * e Wedding.jsx.
+ * com configurações diferentes.
+ *
+ * Para visitantes no enxoval (guestReservations),
+ * o checkbox é substituído pela reserva de
+ * presentes com nome do convidado.
  *
  * @param {object} config
- * @param {string} config.listType  "enxoval" | "casamento"
- * @param {string} config.label     Texto pequeno acima do título
- * @param {string} config.title     Título da página
- * @param {string} config.subtitle  Frase de apoio
- * @param {string} config.progressLabel  Rótulo do progresso
- * @param {string} config.searchPlaceholder
- * @param {string} config.itemPlaceholder Placeholder do novo item
- * @param {Array}  config.initialData  Categorias padrão
  */
 export default function ChecklistPage({
   config
 }) {
+  const {
+    isAdmin,
+  } = useAuth();
+
+  const guestMode =
+    config.guestReservations === true &&
+    !isAdmin;
+
   const checklist =
     useChecklist(
       config.listType,
       config.initialData
+    );
+
+  const reservations =
+    useGiftReservations(
+      config.guestReservations === true
     );
 
   const {
@@ -52,6 +73,93 @@ export default function ChecklistPage({
     askRemoveItem,
     handleRemoveItem,
   } = checklist;
+
+  const {
+    reservationMap,
+    busyItemKey,
+    reserve,
+    cancel,
+    cancelAsAdmin,
+  } = reservations;
+
+  const [reservingItem, setReservingItem] =
+    useState(null);
+
+
+  function openReservation(categoryId, item) {
+    const itemKey =
+      `${config.listType}:${categoryId}:${item.id}`;
+
+    setReservingItem({
+      categoryId,
+      item,
+      itemKey,
+    });
+  }
+
+
+  function closeReservation() {
+    setReservingItem(null);
+  }
+
+
+  async function handleReserve(guestName) {
+    if (!reservingItem) {
+      return;
+    }
+
+    const ok = await reserve(
+      reservingItem.itemKey,
+      guestName
+    );
+
+    if (ok) {
+      closeReservation();
+    }
+  }
+
+
+  async function handleCancelGuest(guestName) {
+    if (!reservingItem) {
+      return;
+    }
+
+    const ok = await cancel(
+      reservingItem.itemKey,
+      guestName
+    );
+
+    if (ok) {
+      closeReservation();
+    }
+  }
+
+
+  async function handleCancelAdmin(itemKey) {
+    const ok = await cancelAsAdmin(itemKey);
+
+    if (ok) {
+      closeReservation();
+    }
+  }
+
+
+  const reservedCount =
+    filteredCategories.reduce(
+      (total, category) =>
+        total +
+        category.items.filter(
+          (item) => {
+            const itemKey =
+              `${config.listType}:${category.id}:${item.id}`;
+
+            return Boolean(
+              reservationMap[itemKey]
+            );
+          }
+        ).length,
+      0
+    );
 
 
   /*
@@ -105,7 +213,9 @@ export default function ChecklistPage({
           </h1>
 
           <p>
-            {config.subtitle}
+            {guestMode
+              ? "Escolha um presente e escreva seu nome para reservá-lo. Cada item pode ser reservado uma única vez. 💝"
+              : config.subtitle}
           </p>
         </div>
       </section>
@@ -143,36 +253,38 @@ export default function ChecklistPage({
 
           {/* PROGRESSO */}
 
-          <div className="progress-card">
-            <div className="progress-header">
-              <div>
-                <span>
-                  {config.progressLabel}
-                </span>
+          {!guestMode && (
+            <div className="progress-card">
+              <div className="progress-header">
+                <div>
+                  <span>
+                    {config.progressLabel}
+                  </span>
 
-                <strong>
-                  {statistics.completed}
-                  {" "}de{" "}
-                  {statistics.total}
-                  {" "}itens
-                </strong>
+                  <strong>
+                    {statistics.completed}
+                    {" "}de{" "}
+                    {statistics.total}
+                    {" "}itens
+                  </strong>
+                </div>
+
+                <div className="progress-percentage">
+                  {statistics.percentage}%
+                </div>
               </div>
 
-              <div className="progress-percentage">
-                {statistics.percentage}%
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{
+                    width:
+                      `${statistics.percentage}%`,
+                  }}
+                />
               </div>
             </div>
-
-            <div className="progress-track">
-              <div
-                className="progress-fill"
-                style={{
-                  width:
-                    `${statistics.percentage}%`,
-                }}
-              />
-            </div>
-          </div>
+          )}
 
 
           {/* PESQUISA */}
@@ -210,6 +322,18 @@ export default function ChecklistPage({
                       item.checked
                   ).length;
 
+                const reserved =
+                  category.items.filter(
+                    (item) => {
+                      const itemKey =
+                        `${config.listType}:${category.id}:${item.id}`;
+
+                      return Boolean(
+                        reservationMap[itemKey]
+                      );
+                    }
+                  ).length;
+
                 return (
                   <section
                     className="category-card"
@@ -232,30 +356,27 @@ export default function ChecklistPage({
                           </h2>
 
                           <span>
-                            {completed}
-                            {" "}de{" "}
-                            {
-                              category
-                                .items
-                                .length
-                            }
-                            {" "}concluídos
+                            {guestMode
+                              ? `${reserved} de ${category.items.length} reservados`
+                              : `${completed} de ${category.items.length} concluídos`}
                           </span>
                         </div>
 
                       </div>
 
-                      <button
-                        type="button"
-                        className="add-item-button"
-                        onClick={() =>
-                          openAddItem(
-                            category.id
-                          )
-                        }
-                      >
-                        + Adicionar
-                      </button>
+                      {!guestMode && (
+                        <button
+                          type="button"
+                          className="add-item-button"
+                          onClick={() =>
+                            openAddItem(
+                              category.id
+                            )
+                          }
+                        >
+                          + Adicionar
+                        </button>
+                      )}
 
                     </header>
 
@@ -264,7 +385,6 @@ export default function ChecklistPage({
 
                     {addingCategory ===
                       category.id && (
-
                       <div className="add-item-form">
 
                         <input
@@ -280,7 +400,6 @@ export default function ChecklistPage({
                             )
                           }
                           onKeyDown={(event) => {
-
                             if (
                               event.key ===
                                 "Enter" &&
@@ -297,7 +416,6 @@ export default function ChecklistPage({
                             ) {
                               cancelAddItem();
                             }
-
                           }}
                         />
 
@@ -328,7 +446,6 @@ export default function ChecklistPage({
                         </button>
 
                       </div>
-
                     )}
 
 
@@ -342,9 +459,68 @@ export default function ChecklistPage({
                           const removeKey =
                             `${category.id}:${item.id}`;
 
+                          const itemKey =
+                            `${config.listType}:${category.id}:${item.id}`;
+
                           const isRemoving =
                             removingItem ===
                             removeKey;
+
+                          const guestName =
+                            reservationMap[itemKey];
+
+                          const isBusy =
+                            busyItemKey ===
+                            itemKey;
+
+                          if (guestMode) {
+                            return (
+                              <button
+                                type="button"
+                                className={
+                                  guestName
+                                    ? "checklist-item-row guest reserved"
+                                    : "checklist-item-row guest"
+                                }
+                                key={item.id}
+                                disabled={isBusy}
+                                onClick={() =>
+                                  openReservation(
+                                    category.id,
+                                    item
+                                  )
+                                }
+                              >
+
+                                <span className="guest-gift-icon">
+                                  {guestName
+                                    ? "🎁"
+                                    : "➕"}
+                                </span>
+
+                                <span className="item-name">
+                                  {item.name}
+                                </span>
+
+                                {guestName && (
+                                  <span className="reservation-badge">
+                                    Reservado por{" "}
+                                    <strong>
+                                      {guestName}
+                                    </strong>
+                                  </span>
+                                )}
+
+                                {isBusy && (
+                                  <span className="item-busy">
+                                    ...
+                                  </span>
+                                )}
+
+                              </button>
+                            );
+                          }
+
 
                           return (
                             <div
@@ -391,6 +567,25 @@ export default function ChecklistPage({
                               </label>
 
 
+                              {/* RESERVA (admin vê badge) */}
+
+                              {guestName && (
+                                <button
+                                  type="button"
+                                  className="reservation-badge clickable"
+                                  title={`Reservado por ${guestName} — clique para cancelar`}
+                                  onClick={() =>
+                                    openReservation(
+                                      category.id,
+                                      item
+                                    )
+                                  }
+                                >
+                                  🎁 {guestName}
+                                </button>
+                              )}
+
+
                               {/* REMOVER ITEM */}
 
                               <button
@@ -425,24 +620,24 @@ export default function ChecklistPage({
 
                     {category.items.length ===
                       0 && (
-
                       <div className="empty-category">
                         <p>
                           Nenhum item nesta categoria.
                         </p>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openAddItem(
-                              category.id
-                            )
-                          }
-                        >
-                          + Adicionar primeiro item
-                        </button>
+                        {!guestMode && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openAddItem(
+                                category.id
+                              )
+                            }
+                          >
+                            + Adicionar primeiro item
+                          </button>
+                        )}
                       </div>
-
                     )}
 
                   </section>
@@ -467,6 +662,22 @@ export default function ChecklistPage({
               </p>
             </div>
 
+          )}
+
+
+          {/* RODAPÉ PARA CONVIDADOS */}
+
+          {guestMode && reservedCount > 0 && (
+            <div className="guest-resume">
+              🎁 Você já viu{" "}
+              <strong>
+                {reservedCount}
+              </strong>{" "}
+              {reservedCount === 1
+                ? "item reservado"
+                : "itens reservados"}{" "}
+              até agora!
+            </div>
           )}
 
         </div>
@@ -527,6 +738,30 @@ export default function ChecklistPage({
           </div>
 
         </div>
+      )}
+
+
+      {/* MODAL DE RESERVA */}
+
+      {reservingItem && (
+        <ReservationModal
+          item={reservingItem.item}
+          itemKey={reservingItem.itemKey}
+          guestName={
+            reservationMap[
+              reservingItem.itemKey
+            ]
+          }
+          isAdmin={isAdmin}
+          busy={
+            busyItemKey ===
+            reservingItem.itemKey
+          }
+          onReserve={handleReserve}
+          onCancelGuest={handleCancelGuest}
+          onCancelAdmin={handleCancelAdmin}
+          onClose={closeReservation}
+        />
       )}
 
     </main>

@@ -2,8 +2,16 @@ import {
   NavLink,
 } from "react-router";
 
+import { useAuth }
+  from "../context/AuthContext";
+
 
 export default function MobileNav() {
+  const {
+    session,
+    isAdmin,
+  } = useAuth();
+
   function getLinkClass({
     isActive,
   }) {
@@ -52,34 +60,54 @@ export default function MobileNav() {
       </NavLink>
 
 
-      {/* CASAMENTO */}
+      {/* CASAMENTO (somente casal) */}
+
+      {isAdmin && (
+        <NavLink
+          to="/casamento"
+          className={getLinkClass}
+        >
+          <span className="mobile-bottom-icon">
+            💒
+          </span>
+
+          <span>
+            Casamento
+          </span>
+        </NavLink>
+      )}
+
+
+      {/* ORÇAMENTO (somente casal) */}
+
+      {isAdmin && (
+        <NavLink
+          to="/orcamento"
+          className={getLinkClass}
+        >
+          <span className="mobile-bottom-icon">
+            💰
+          </span>
+
+          <span>
+            Orçamento
+          </span>
+        </NavLink>
+      )}
+
+
+      {/* ÁREA DO CASAL */}
 
       <NavLink
-        to="/casamento"
+        to="/admin"
         className={getLinkClass}
       >
         <span className="mobile-bottom-icon">
-          💒
+          {session ? "👥" : "🔒"}
         </span>
 
         <span>
-          Casamento
-        </span>
-      </NavLink>
-
-
-      {/* ORÇAMENTO */}
-
-      <NavLink
-        to="/orcamento"
-        className={getLinkClass}
-      >
-        <span className="mobile-bottom-icon">
-          💰
-        </span>
-
-        <span>
-          Orçamento
+          {session ? "Casal" : "Área"}
         </span>
       </NavLink>
 

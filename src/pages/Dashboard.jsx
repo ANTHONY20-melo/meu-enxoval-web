@@ -13,10 +13,27 @@ import {
 
 import { Link } from "react-router";
 
+import { useAuth }
+  from "../context/AuthContext";
+
 import "../App.css";
 
 
+/**
+ * Página inicial.
+ *
+ * Para visitantes (não logados) mostra
+ * apenas o progresso público do enxoval.
+ * Para o casal autenticado, mostra também
+ * o planejamento do casamento e o orçamento.
+ */
 export default function Dashboard() {
+  const {
+    session,
+    isAdmin,
+    authLoading,
+  } = useAuth();
+
   const [loading, setLoading] =
     useState(true);
 
@@ -51,15 +68,24 @@ export default function Dashboard() {
       try {
         setLoading(true);
 
-        const [
-          enxovalItems,
-          casamentoItems,
-          budgetItems,
-        ] = await Promise.all([
+        const tasks = [
           loadChecklist("enxoval"),
-          loadChecklist("casamento"),
-          loadBudgetItems(),
-        ]);
+        ];
+
+        if (session && isAdmin) {
+          tasks.push(
+            loadChecklist("casamento")
+          );
+
+          tasks.push(
+            loadBudgetItems()
+          );
+        }
+
+        const results =
+          await Promise.all(tasks);
+
+        const enxovalItems = results[0];
 
         setEnxovalStats(
           calculateStats(
@@ -67,17 +93,24 @@ export default function Dashboard() {
           )
         );
 
-        setCasamentoStats(
-          calculateStats(
-            casamentoItems
-          )
-        );
+        if (session && isAdmin) {
+          const casamentoItems =
+            results[1];
+          const budgetItems =
+            results[2];
 
-        setBudgetStats(
-          calculateBudgetStats(
-            budgetItems
-          )
-        );
+          setCasamentoStats(
+            calculateStats(
+              casamentoItems
+            )
+          );
+
+          setBudgetStats(
+            calculateBudgetStats(
+              budgetItems
+            )
+          );
+        }
 
       } catch (err) {
         console.error(
@@ -96,7 +129,8 @@ export default function Dashboard() {
 
     loadDashboard();
 
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, isAdmin]);
 
 
   function calculateStats(items) {
@@ -168,7 +202,7 @@ export default function Dashboard() {
   }
 
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <main className="dashboard-page">
 
@@ -249,14 +283,16 @@ export default function Dashboard() {
 
 
           <h2 className="dashboard-title">
-            Nosso progresso
+            {session && isAdmin
+              ? "Nosso progresso"
+              : "Como posso ajudar?"}
           </h2>
 
 
           <div className="dashboard-grid">
 
 
-            {/* ENXOVAL */}
+            {/* ENXOVAL (público) */}
 
             <Link
               to="/enxoval"
@@ -303,114 +339,125 @@ export default function Dashboard() {
 
 
               <strong className="dashboard-card-link">
-                Ver enxoval →
+                {session && isAdmin
+                  ? "Ver enxoval →"
+                  : "Ver lista de presentes →"}
               </strong>
 
             </Link>
 
 
-            {/* CASAMENTO */}
+            {/* CASAMENTO (somente casal) */}
 
-            <Link
-              to="/casamento"
-              className="dashboard-card"
-            >
+            {session && isAdmin && (
 
-              <div className="dashboard-card-top">
+              <Link
+                to="/casamento"
+                className="dashboard-card"
+              >
 
-                <div className="dashboard-card-icon">
-                  💒
+                <div className="dashboard-card-top">
+
+                  <div className="dashboard-card-icon">
+                    💒
+                  </div>
+
+
+                  <span>
+                    {casamentoStats.percentage}%
+                  </span>
+
                 </div>
 
 
-                <span>
-                  {casamentoStats.percentage}%
-                </span>
-
-              </div>
+                <h3>
+                  Nosso Casamento
+                </h3>
 
 
-              <h3>
-                Nosso Casamento
-              </h3>
+                <p>
+                  {casamentoStats.completed}
+                  {" "}de{" "}
+                  {casamentoStats.total}
+                  {" "}itens concluídos
+                </p>
 
 
-              <p>
-                {casamentoStats.completed}
-                {" "}de{" "}
-                {casamentoStats.total}
-                {" "}itens concluídos
-              </p>
+                <div className="dashboard-progress">
 
+                  <div
+                    style={{
+                      width:
+                        `${casamentoStats.percentage}%`,
+                    }}
+                  />
 
-              <div className="dashboard-progress">
-
-                <div
-                  style={{
-                    width:
-                      `${casamentoStats.percentage}%`,
-                  }}
-                />
-
-              </div>
-
-
-              <strong className="dashboard-card-link">
-                Ver planejamento →
-              </strong>
-
-            </Link>
-
-
-            {/* ORÇAMENTO */}
-
-            <Link
-              to="/orcamento"
-              className="dashboard-card"
-            >
-
-              <div className="dashboard-card-top">
-
-                <div className="dashboard-card-icon">
-                  💰
                 </div>
 
-                <span>
-                  {budgetStats.items} itens
-                </span>
 
-              </div>
+                <strong className="dashboard-card-link">
+                  Ver planejamento →
+                </strong>
 
+              </Link>
 
-              <h3>
-                Orçamento
-              </h3>
+            )}
 
 
-              <p>
-                Controle de gastos,
-                pagamentos e valores
-                pendentes.
-              </p>
+            {/* ORÇAMENTO (somente casal) */}
+
+            {session && isAdmin && (
+
+              <Link
+                to="/orcamento"
+                className="dashboard-card"
+              >
+
+                <div className="dashboard-card-top">
+
+                  <div className="dashboard-card-icon">
+                    💰
+                  </div>
 
 
-              <div className="dashboard-progress">
+                  <span>
+                    {budgetStats.items} itens
+                  </span>
 
-                <div
-                  style={{
-                    width:
-                      `${budgetStats.paidPercentage}%`,
-                  }}
-                />
-
-              </div>
+                </div>
 
 
-              <strong className="dashboard-card-link">
-                Abrir orçamento →
-              </strong>
+                <h3>
+                  Orçamento
+                </h3>
 
-            </Link>
+
+                <p>
+                  Controle de gastos,
+                  pagamentos e valores
+                  pendentes.
+                </p>
+
+
+                <div className="dashboard-progress">
+
+                  <div
+                    style={{
+                      width:
+                        `${budgetStats.paidPercentage}%`,
+                    }}
+                  />
+
+                </div>
+
+
+                <strong className="dashboard-card-link">
+                  Abrir orçamento →
+                </strong>
+
+              </Link>
+
+            )}
 
 
           </div>

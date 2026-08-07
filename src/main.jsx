@@ -13,6 +13,9 @@ import ErrorBoundary
 import { CartProvider }
   from "./context/CartContext";
 
+import { AuthProvider }
+  from "./context/AuthContext";
+
 import "./index.css";
 
 
@@ -44,13 +47,15 @@ createRoot(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <CartProvider>
-          <Suspense
-            fallback={<PageLoader />}
-          >
-            <App />
-          </Suspense>
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <Suspense
+              fallback={<PageLoader />}
+            >
+              <App />
+            </Suspense>
+          </CartProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>

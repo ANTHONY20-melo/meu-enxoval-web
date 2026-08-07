@@ -27,6 +27,8 @@ export const enxovalConfig = {
 
   sectionId: "checklist",
 
+  guestReservations: true,
+
   initialData: checklist,
 };
 

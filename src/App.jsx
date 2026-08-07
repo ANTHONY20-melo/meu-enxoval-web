@@ -11,6 +11,7 @@ import {
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MobileNav from "./components/MobileNav";
+import AdminGuard from "./components/AdminGuard";
 
 import "./App.css";
 
@@ -55,6 +56,11 @@ const Cancel =
     import("./pages/Cancel")
   );
 
+const Admin =
+  lazy(() =>
+    import("./pages/AdminPage")
+  );
+
 
 export default function App() {
   return (
@@ -90,12 +96,25 @@ export default function App() {
 
             <Route
               path="/casamento"
-              element={<Wedding />}
+              element={
+                <AdminGuard>
+                  <Wedding />
+                </AdminGuard>
+              }
             />
 
             <Route
               path="/orcamento"
-              element={<Budget />}
+              element={
+                <AdminGuard>
+                  <Budget />
+                </AdminGuard>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={<Admin />}
             />
 
             <Route

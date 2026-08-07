@@ -3,8 +3,16 @@ import {
   NavLink,
 } from "react-router";
 
+import { useAuth }
+  from "../context/AuthContext";
+
 
 export default function Header() {
+  const {
+    session,
+    isAdmin,
+  } = useAuth();
+
   function getNavLinkClass({
     isActive,
   }) {
@@ -56,25 +64,38 @@ export default function Header() {
           </NavLink>
 
 
-          <NavLink
-            to="/casamento"
-            className={getNavLinkClass}
+          {isAdmin && (
+            <NavLink
+              to="/casamento"
+              className={getNavLinkClass}
+            >
+              💒 Casamento
+            </NavLink>
+          )}
+
+
+          {isAdmin && (
+            <NavLink
+              to="/orcamento"
+              className={getNavLinkClass}
+            >
+              💰 Orçamento
+            </NavLink>
+          )}
+
+
+          <Link
+            to="/admin"
+            className={
+              session
+                ? "nav-link"
+                : "nav-link"
+            }
           >
-            💒 Casamento
-          </NavLink>
-
-
-          <NavLink
-            to="/orcamento"
-            className={getNavLinkClass}
-          >
-            💰 Orçamento
-          </NavLink>
-
-
-          <span className="couple-badge">
-            ❤️ Nosso Lar
-          </span>
+            {session
+              ? "👥 Casal"
+              : "🔒 Área do casal"}
+          </Link>
 
         </nav>
 
