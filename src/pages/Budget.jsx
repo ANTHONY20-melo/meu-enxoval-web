@@ -89,10 +89,10 @@ export default function Budget() {
 
         setItems(data);
 
-      } catch (error) {
+      } catch (err) {
         console.error(
           "Erro ao carregar orçamento:",
-          error
+          err
         );
 
 
@@ -377,10 +377,10 @@ export default function Budget() {
 
       cancelForm();
 
-    } catch (error) {
+    } catch (err) {
       console.error(
         "Erro ao salvar despesa:",
-        error
+        err
       );
 
 
@@ -429,10 +429,10 @@ export default function Budget() {
           )
       );
 
-    } catch (error) {
+    } catch (err) {
       console.error(
         "Erro ao remover despesa:",
-        error
+        err
       );
 
 

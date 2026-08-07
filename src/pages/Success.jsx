@@ -5,7 +5,7 @@ import {
 import {
   Link,
   useSearchParams
-} from "react-router-dom";
+} from "react-router";
 
 import {
   useCart
@@ -27,7 +27,7 @@ export default function Success() {
     if (status !== "pending") {
       clearCart();
     }
-  }, []);
+  }, [clearCart, status]);
 
   return (
     <main className="result-page">

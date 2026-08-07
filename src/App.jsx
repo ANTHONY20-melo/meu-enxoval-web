@@ -1,23 +1,59 @@
+﻿import {
+  lazy,
+  Suspense,
+} from "react";
 import {
   Routes,
   Route,
   Navigate,
-} from "react-router-dom";
+} from "react-router";
 
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MobileNav from "./components/MobileNav";
 
-import Dashboard from "./pages/Dashboard";
-import Home from "./pages/Home";
-import Wedding from "./pages/Wedding";
-import Budget from "./pages/Budget";
-
-import Checkout from "./pages/Checkout";
-import Success from "./pages/Success";
-import Cancel from "./pages/Cancel";
-
 import "./App.css";
+
+
+/*
+Páginas carregadas sob demanda
+(code splitting por rota).
+*/
+
+const Dashboard =
+  lazy(() =>
+    import("./pages/Dashboard")
+  );
+
+const Home =
+  lazy(() =>
+    import("./pages/Home")
+  );
+
+const Wedding =
+  lazy(() =>
+    import("./pages/Wedding")
+  );
+
+const Budget =
+  lazy(() =>
+    import("./pages/Budget")
+  );
+
+const Checkout =
+  lazy(() =>
+    import("./pages/Checkout")
+  );
+
+const Success =
+  lazy(() =>
+    import("./pages/Success")
+  );
+
+const Cancel =
+  lazy(() =>
+    import("./pages/Cancel")
+  );
 
 
 export default function App() {
@@ -28,90 +64,76 @@ export default function App() {
 
       <Header />
 
-
       {/* CONTEÚDO PRINCIPAL */}
 
       <div className="app-content">
 
-        <Routes>
+        <Suspense
+          fallback={
+            <div className="route-loading">
+              Carregando...
+            </div>
+          }
+        >
 
-          {/* DASHBOARD */}
+          <Routes>
 
-          <Route
-            path="/"
-            element={<Dashboard />}
-          />
+            <Route
+              path="/"
+              element={<Dashboard />}
+            />
 
+            <Route
+              path="/enxoval"
+              element={<Home />}
+            />
 
-          {/* ENXOVAL */}
+            <Route
+              path="/casamento"
+              element={<Wedding />}
+            />
 
-          <Route
-            path="/enxoval"
-            element={<Home />}
-          />
+            <Route
+              path="/orcamento"
+              element={<Budget />}
+            />
 
+            <Route
+              path="/checkout"
+              element={<Checkout />}
+            />
 
-          {/* CASAMENTO */}
+            <Route
+              path="/success"
+              element={<Success />}
+            />
 
-          <Route
-            path="/casamento"
-            element={<Wedding />}
-          />
+            <Route
+              path="/cancel"
+              element={<Cancel />}
+            />
 
+            {/* ROTA NÃO ENCONTRADA */}
 
-          {/* ORÇAMENTO */}
+            <Route
+              path="*"
+              element={
+                <Navigate
+                  to="/"
+                  replace
+                />
+              }
+            />
 
-          <Route
-            path="/orcamento"
-            element={<Budget />}
-          />
+          </Routes>
 
-
-          {/* PAGAMENTO */}
-
-          <Route
-            path="/checkout"
-            element={<Checkout />}
-          />
-
-
-          {/* PAGAMENTO APROVADO */}
-
-          <Route
-            path="/success"
-            element={<Success />}
-          />
-
-
-          {/* PAGAMENTO CANCELADO */}
-
-          <Route
-            path="/cancel"
-            element={<Cancel />}
-          />
-
-
-          {/* ROTA NÃO ENCONTRADA */}
-
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to="/"
-                replace
-              />
-            }
-          />
-
-        </Routes>
+        </Suspense>
 
       </div>
-
 
       {/* RODAPÉ */}
 
       <Footer />
-
 
       {/* MENU MOBILE */}
 

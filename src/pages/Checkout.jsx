@@ -4,7 +4,7 @@ import {
 
 import {
   Link
-} from "react-router-dom";
+} from "react-router";
 
 import Cart
   from "../components/Cart";

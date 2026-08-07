@@ -7,7 +7,11 @@ import {
   loadChecklist,
 } from "../services/checklistService";
 
-import { Link } from "react-router-dom";
+import {
+  loadBudgetItems,
+} from "../services/budgetService";
+
+import { Link } from "react-router";
 
 import "../App.css";
 
@@ -15,6 +19,9 @@ import "../App.css";
 export default function Dashboard() {
   const [loading, setLoading] =
     useState(true);
+
+  const [error, setError] =
+    useState("");
 
   const [enxovalStats, setEnxovalStats] =
     useState({
@@ -32,21 +39,27 @@ export default function Dashboard() {
     percentage: 0,
   });
 
+  const [budgetStats, setBudgetStats] =
+    useState({
+      items: 0,
+      paidPercentage: 0,
+    });
+
 
   useEffect(() => {
     async function loadDashboard() {
       try {
         setLoading(true);
 
-
         const [
           enxovalItems,
           casamentoItems,
+          budgetItems,
         ] = await Promise.all([
           loadChecklist("enxoval"),
           loadChecklist("casamento"),
+          loadBudgetItems(),
         ]);
-
 
         setEnxovalStats(
           calculateStats(
@@ -54,24 +67,32 @@ export default function Dashboard() {
           )
         );
 
-
         setCasamentoStats(
           calculateStats(
             casamentoItems
           )
         );
 
-      } catch (error) {
+        setBudgetStats(
+          calculateBudgetStats(
+            budgetItems
+          )
+        );
+
+      } catch (err) {
         console.error(
           "Erro ao carregar dashboard:",
-          error
+          err
+        );
+
+        setError(
+          "Não foi possível carregar o painel. Verifique sua conexão."
         );
 
       } finally {
         setLoading(false);
       }
     }
-
 
     loadDashboard();
 
@@ -85,17 +106,14 @@ export default function Dashboard() {
           item.deleted !== true
       );
 
-
     const total =
       activeItems.length;
-
 
     const completed =
       activeItems.filter(
         (item) =>
           item.checked
       ).length;
-
 
     const percentage =
       total === 0
@@ -104,11 +122,48 @@ export default function Dashboard() {
             (completed / total) * 100
           );
 
-
     return {
       completed,
       total,
       percentage,
+    };
+  }
+
+
+  function calculateBudgetStats(items) {
+    const actual =
+      items.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item.actual_value || 0
+          ),
+        0
+      );
+
+    const paid =
+      items.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item.paid_value || 0
+          ),
+        0
+      );
+
+    const paidPercentage =
+      actual <= 0
+        ? 0
+        : Math.min(
+            Math.round(
+              (paid / actual) * 100
+            ),
+            100
+          );
+
+    return {
+      items: items.length,
+      paidPercentage,
     };
   }
 
@@ -166,6 +221,31 @@ export default function Dashboard() {
       <section className="dashboard-content">
 
         <div className="container">
+
+
+          {/* MENSAGEM DE ERRO */}
+
+          {error && (
+
+            <div className="checklist-error">
+
+              <span>
+                {error}
+              </span>
+
+              <button
+                type="button"
+                aria-label="Fechar mensagem de erro"
+                onClick={() =>
+                  setError("")
+                }
+              >
+                ×
+              </button>
+
+            </div>
+
+          )}
 
 
           <h2 className="dashboard-title">
@@ -286,7 +366,7 @@ export default function Dashboard() {
 
             <Link
               to="/orcamento"
-              className="dashboard-card dashboard-card-coming"
+              className="dashboard-card"
             >
 
               <div className="dashboard-card-top">
@@ -294,6 +374,10 @@ export default function Dashboard() {
                 <div className="dashboard-card-icon">
                   💰
                 </div>
+
+                <span>
+                  {budgetStats.items} itens
+                </span>
 
               </div>
 
@@ -310,42 +394,20 @@ export default function Dashboard() {
               </p>
 
 
-              <strong className="dashboard-card-link">
-                Abrir orçamento →
-              </strong>
+              <div className="dashboard-progress">
 
-            </Link>
-
-
-            {/* CONVIDADOS */}
-
-            <Link
-              to="/convidados"
-              className="dashboard-card dashboard-card-coming"
-            >
-
-              <div className="dashboard-card-top">
-
-                <div className="dashboard-card-icon">
-                  👥
-                </div>
+                <div
+                  style={{
+                    width:
+                      `${budgetStats.paidPercentage}%`,
+                  }}
+                />
 
               </div>
 
 
-              <h3>
-                Convidados
-              </h3>
-
-
-              <p>
-                Lista de convidados e
-                controle de confirmações.
-              </p>
-
-
               <strong className="dashboard-card-link">
-                Ver convidados →
+                Abrir orçamento →
               </strong>
 
             </Link>

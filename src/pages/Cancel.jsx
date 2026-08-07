@@ -1,6 +1,6 @@
 import {
   Link
-} from "react-router-dom";
+} from "react-router";
 
 export default function Cancel() {
   return (
