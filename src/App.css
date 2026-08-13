@@ -3265,6 +3265,15 @@ body {
   background: #fbf3ec;
 }
 
+.checklist-item-row.guest .item-name {
+  flex: 1;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .guest-gift-icon {
   font-size: 1.1rem;
 
@@ -3296,10 +3305,27 @@ body {
   white-space: nowrap;
 }
 
+.reservation-badge.mine {
+  background: #e2f2e4;
+
+  color: #2e7d4f;
+}
+
+.reservation-badge.plain {
+  background: #f1ecea;
+
+  color: #7d6a6a;
+}
+
 .reservation-badge.clickable {
   cursor: pointer;
 
   border: 1px solid transparent;
+
+  max-width: 40vw;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   transition: border-color 0.2s ease;
 }

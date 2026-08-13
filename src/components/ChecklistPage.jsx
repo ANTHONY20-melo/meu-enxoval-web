@@ -1,5 +1,6 @@
 import {
   useState,
+  useEffect,
 } from "react";
 
 import {
@@ -15,6 +16,13 @@ import { useAuth }
 
 import ReservationModal
   from "./ReservationModal";
+
+import {
+  loadMyGuestNames,
+  rememberGuestName,
+  forgetGuestName,
+  pruneMyGuestNames,
+} from "../services/localGuestNames";
 
 
 /**
@@ -80,10 +88,53 @@ export default function ChecklistPage({
     reserve,
     cancel,
     cancelAsAdmin,
+    loading: reservationsLoading,
   } = reservations;
 
   const [reservingItem, setReservingItem] =
     useState(null);
+
+  const [myNames, setMyNames] =
+    useState({});
+
+
+  // Lê no início os nomes já usados neste
+  // dispositivo.
+  useEffect(() => {
+    setMyNames(
+      loadMyGuestNames()
+    );
+  }, []);
+
+
+  // Remove nomes locais de itens que não
+  // têm mais reserva ativa (cancelados em
+  // outro aparelho).
+  useEffect(() => {
+    if (reservationsLoading) {
+      return;
+    }
+
+    const active = new Set(
+      Object.keys(reservationMap)
+    );
+
+    pruneMyGuestNames(active);
+
+    setMyNames((previous) => {
+      const next = {};
+
+      for (const [key, value] of Object.entries(
+        previous
+      )) {
+        if (active.has(key)) {
+          next[key] = value;
+        }
+      }
+
+      return next;
+    });
+  }, [reservationMap, reservationsLoading]);
 
 
   function openReservation(categoryId, item) {
@@ -114,6 +165,15 @@ export default function ChecklistPage({
     );
 
     if (ok) {
+      rememberGuestName(
+        reservingItem.itemKey,
+        guestName
+      );
+
+      setMyNames(
+        loadMyGuestNames()
+      );
+
       closeReservation();
     }
   }
@@ -130,6 +190,14 @@ export default function ChecklistPage({
     );
 
     if (ok) {
+      forgetGuestName(
+        reservingItem.itemKey
+      );
+
+      setMyNames(
+        loadMyGuestNames()
+      );
+
       closeReservation();
     }
   }
@@ -155,6 +223,26 @@ export default function ChecklistPage({
 
             return Boolean(
               reservationMap[itemKey]
+            );
+          }
+        ).length,
+      0
+    );
+
+  // Itens reservados por este dispositivo
+  // ("Você reservou").
+  const myCount =
+    filteredCategories.reduce(
+      (total, category) =>
+        total +
+        category.items.filter(
+          (item) => {
+            const itemKey =
+              `${config.listType}:${category.id}:${item.id}`;
+
+            return Boolean(
+              reservationMap[itemKey] &&
+                myNames[itemKey]
             );
           }
         ).length,
@@ -469,6 +557,14 @@ export default function ChecklistPage({
                           const guestName =
                             reservationMap[itemKey];
 
+                          // Reservado por este
+                          // dispositivo?
+                          const isMine =
+                            Boolean(
+                              guestName &&
+                                myNames[itemKey]
+                            );
+
                           const isBusy =
                             busyItemKey ===
                             itemKey;
@@ -503,11 +599,16 @@ export default function ChecklistPage({
                                 </span>
 
                                 {guestName && (
-                                  <span className="reservation-badge">
-                                    Reservado por{" "}
-                                    <strong>
-                                      {guestName}
-                                    </strong>
+                                  <span
+                                    className={
+                                      isMine
+                                        ? "reservation-badge mine"
+                                        : "reservation-badge plain"
+                                    }
+                                  >
+                                    {isMine
+                                      ? "✅ Você reservou"
+                                      : "Reservado"}
                                   </span>
                                 )}
 
@@ -667,16 +768,38 @@ export default function ChecklistPage({
 
           {/* RODAPÉ PARA CONVIDADOS */}
 
-          {guestMode && reservedCount > 0 && (
+          {guestMode && (
             <div className="guest-resume">
-              🎁 Você já viu{" "}
-              <strong>
-                {reservedCount}
-              </strong>{" "}
-              {reservedCount === 1
-                ? "item reservado"
-                : "itens reservados"}{" "}
-              até agora!
+              {myCount > 0 ? (
+                <>
+                  🎁 Você reservou{" "}
+                  <strong>
+                    {myCount}
+                  </strong>{" "}
+                  {myCount === 1
+                    ? "item"
+                    : "itens"}{" "}
+                  até agora! Toque no item
+                  para desfazer.
+                </>
+              ) : reservedCount > 0 ? (
+                <>
+                  🎁{" "}
+                  <strong>
+                    {reservedCount}
+                  </strong>{" "}
+                  {reservedCount === 1
+                    ? "item já foi reservado"
+                    : "itens já foram reservados"}
+                  . Escolha os seus!
+                </>
+              ) : (
+                <>
+                  ✨ Todos os itens estão
+                  disponíveis. Escolha os
+                  seus!
+                </>
+              )}
             </div>
           )}
 
@@ -751,6 +874,19 @@ export default function ChecklistPage({
             reservationMap[
               reservingItem.itemKey
             ]
+          }
+          isMine={Boolean(
+            reservationMap[
+              reservingItem.itemKey
+            ] &&
+              myNames[
+                reservingItem.itemKey
+              ]
+          )}
+          myName={
+            myNames[
+              reservingItem.itemKey
+            ] || ""
           }
           isAdmin={isAdmin}
           busy={

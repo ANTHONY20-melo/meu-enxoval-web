@@ -10,17 +10,23 @@ import {
  * Modo convidado (sem reserva): pede o nome
  * e reserva o item.
  *
- * Modo convidado (já reservado): mostra quem
- * reservou e permite desfazer informando o
- * mesmo nome.
+ * Modo convidado (reserva É deste aparelho):
+ * mostra "Você reservou" e permite desfazer
+ * informando o mesmo nome (já preenchido).
  *
- * Modo admin: permite cancelar qualquer
- * reserva sem digitar nome.
+ * Modo convidado (reserva de outro):
+ * mostra apenas "Item já reservado", sem
+ * expor o nome de quem reservou.
+ *
+ * Modo admin: mostra quem reservou e permite
+ * cancelar qualquer reserva sem digitar nome.
  */
 export default function ReservationModal({
   item,
   itemKey,
   guestName,
+  isMine = false,
+  myName = "",
   isAdmin,
   busy,
   onReserve,
@@ -33,9 +39,12 @@ export default function ReservationModal({
 
 
   useEffect(() => {
-    setName("");
+    setName(
+      isMine && myName ? myName : ""
+    );
+
     setError("");
-  }, [itemKey]);
+  }, [itemKey, isMine, myName]);
 
 
   function handleReserve(event) {
@@ -100,7 +109,9 @@ export default function ReservationModal({
           {guestName
             ? isAdmin
               ? "Reserva existente"
-              : "Item já reservado"
+              : isMine
+                ? "Você reservou este item"
+                : "Item já reservado"
             : "Quem vai dar este presente?"}
         </h3>
 
@@ -115,17 +126,22 @@ export default function ReservationModal({
 
         {guestName && !isAdmin && (
           <div className="reservation-info">
-            <span className="reservation-badge">
-              🎁 Reservado por{" "}
-              <strong>
-                {guestName}
-              </strong>
+            <span
+              className={
+                isMine
+                  ? "reservation-badge mine"
+                  : "reservation-badge plain"
+              }
+            >
+              {isMine
+                ? "✅ Você reservou este item"
+                : "🎁 Este item já foi reservado"}
             </span>
 
             <p className="reservation-note">
-              Se você fez essa reserva e quer
-              desfazê-la, digite seu nome
-              abaixo.
+              {isMine
+                ? "Para desfazer sua reserva, toque no botão abaixo."
+                : "Escolha outro item da lista para presentear. 😊"}
             </p>
           </div>
         )}
@@ -142,9 +158,9 @@ export default function ReservationModal({
         )}
 
 
-        {/* CAMPO NOME (convidado) */}
+        {/* CAMPO NOME (convidado — livre ou reserva própria) */}
 
-        {!isAdmin && (
+        {!isAdmin && (!guestName || isMine) && (
           <form
             onSubmit={
               guestName
@@ -211,6 +227,24 @@ export default function ReservationModal({
             </div>
 
           </form>
+        )}
+
+
+        {/* RESERVA DE OUTRO CONVIDADO */}
+
+        {!isAdmin && guestName && !isMine && (
+          <div className="confirm-actions">
+
+            <button
+              type="button"
+              className="confirm-reserve-button"
+              disabled={busy}
+              onClick={onClose}
+            >
+              Fechar
+            </button>
+
+          </div>
         )}
 
 
