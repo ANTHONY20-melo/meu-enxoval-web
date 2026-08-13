@@ -13,6 +13,9 @@ dist/
 .env.local
 .env.production
 
+# App mobile (Expo) separado, fora deste repo
+nosso-casamento-app/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

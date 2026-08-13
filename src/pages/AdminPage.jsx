@@ -23,12 +23,19 @@ export default function AdminPage() {
     isAdmin,
     authLoading,
     signIn,
+    signUp,
     signOut,
     claimAdmin,
   } = useAuth();
 
+  const [mode, setMode] = useState(
+    "login"
+  );
+
   const [email, setEmail] = useState("");
   const [password, setPassword] =
+    useState("");
+  const [confirmPassword, setConfirmPassword] =
     useState("");
 
   const [formError, setFormError] =
@@ -89,6 +96,121 @@ export default function AdminPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setFormError("");
+    setSuccessMessage("");
+    setPassword("");
+    setConfirmPassword("");
+  }
+
+
+  async function handleSignup(event) {
+    event.preventDefault();
+
+    if (submitting) {
+      return;
+    }
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      setFormError(
+        "Preencha e-mail e senha."
+      );
+
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError(
+        "A senha deve ter pelo menos 6 caracteres."
+      );
+
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError(
+        "As senhas não conferem."
+      );
+
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setFormError("");
+      setSuccessMessage("");
+
+      const session = await signUp(
+        normalizedEmail,
+        password
+      );
+
+      setPassword("");
+      setConfirmPassword("");
+
+      if (session) {
+        // Autoconfirm ativo: já entrou.
+        setSuccessMessage(
+          "Conta criada! Agora clique em \"Tornar-me administrador\" para liberar a área do casal."
+        );
+      } else {
+        // Confirmação de e-mail ativa.
+        setSuccessMessage(
+          "Cadastro criado! Confirme seu e-mail pelo link que enviamos e depois entre."
+        );
+      }
+    } catch (err) {
+      console.error(
+        "Erro ao criar conta:",
+        err
+      );
+
+      setFormError(
+        friendlySignupError(err)
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+
+  function friendlySignupError(err) {
+    const message =
+      (err?.message || "")
+        .toLowerCase();
+
+    if (
+      message.includes("already registered")
+    ) {
+      return "Este e-mail já está cadastrado. Entre na aba \"Entrar\".";
+    }
+
+    if (
+      message.includes("password should be at least")
+    ) {
+      return "A senha deve ter pelo menos 6 caracteres.";
+    }
+
+    if (
+      message.includes("rate limit")
+    ) {
+      return "Muitas tentativas. Aguarde um pouco e tente de novo.";
+    }
+
+    if (
+      message.includes("valid email")
+    ) {
+      return "Digite um e-mail válido.";
+    }
+
+    return "Não foi possível criar a conta. Tente novamente.";
   }
 
 
@@ -164,9 +286,46 @@ export default function AdminPage() {
         <section className="admin-section">
           <div className="container">
 
+            <div
+              className="admin-tabs"
+              role="tablist"
+            >
+              <button
+                type="button"
+                className={
+                  mode === "login"
+                    ? "admin-tab active"
+                    : "admin-tab"
+                }
+                onClick={() =>
+                  switchMode("login")
+                }
+              >
+                Entrar
+              </button>
+
+              <button
+                type="button"
+                className={
+                  mode === "signup"
+                    ? "admin-tab active"
+                    : "admin-tab"
+                }
+                onClick={() =>
+                  switchMode("signup")
+                }
+              >
+                Criar conta
+              </button>
+            </div>
+
             <form
               className="admin-form"
-              onSubmit={handleLogin}
+              onSubmit={
+                mode === "login"
+                  ? handleLogin
+                  : handleSignup
+              }
             >
 
               <label className="admin-field">
@@ -191,7 +350,11 @@ export default function AdminPage() {
                 <input
                   type="password"
                   value={password}
-                  autoComplete="current-password"
+                  autoComplete={
+                    mode === "login"
+                      ? "current-password"
+                      : "new-password"
+                  }
                   placeholder="Sua senha"
                   onChange={(event) =>
                     setPassword(
@@ -201,9 +364,35 @@ export default function AdminPage() {
                 />
               </label>
 
+              {mode === "signup" && (
+                <label className="admin-field">
+                  <span>
+                    Confirmar senha
+                  </span>
+
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    autoComplete="new-password"
+                    placeholder="Repita a senha"
+                    onChange={(event) =>
+                      setConfirmPassword(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              )}
+
               {formError && (
                 <p className="admin-error">
                   {formError}
+                </p>
+              )}
+
+              {successMessage && (
+                <p className="admin-success">
+                  {successMessage}
                 </p>
               )}
 
@@ -213,21 +402,18 @@ export default function AdminPage() {
                 disabled={submitting}
               >
                 {submitting
-                  ? "Entrando..."
-                  : "Entrar"}
+                  ? "Processando..."
+                  : mode === "login"
+                    ? "Entrar"
+                    : "Criar conta"}
               </button>
 
             </form>
 
             <p className="admin-hint">
-              Ainda não tem conta? No Supabase,
-              vá em{" "}
-              <strong>
-                Authentication → Users
-              </strong>{" "}
-              e crie o usuário com o e-mail do
-              casal (ou use a opção de criar
-              conta na tela de login).
+              {mode === "login"
+                ? "Ainda não tem conta? Use a aba \"Criar conta\" para cadastrar o e-mail do casal."
+                : "Crie a conta com o e-mail do casal. Depois de entrar, clique em \"Tornar-me administrador\"."}
             </p>
 
           </div>

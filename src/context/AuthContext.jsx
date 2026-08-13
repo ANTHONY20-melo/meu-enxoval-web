@@ -23,6 +23,7 @@ const AuthContext = createContext({
   isAdmin: false,
   authLoading: true,
   signIn: async () => {},
+  signUp: async () => {},
   signOut: async () => {},
   claimAdmin: async () => false,
 });
@@ -143,6 +144,38 @@ export function AuthProvider({ children }) {
   }
 
 
+  /**
+   * Cadastro do casal direto no site.
+   *
+   * Com a confirmação de e-mail ativa no
+   * Supabase, retorna session = null e o
+   * usuário precisa confirmar o link antes
+   * do primeiro login. Se autoconfirm estiver
+   * ativo, retorna a sessão logada.
+   */
+  async function signUp(email, password) {
+    const { data, error } =
+      await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const session = data.session || null;
+
+    if (session) {
+      await refreshAdmin(
+        session.user?.email
+      );
+    }
+
+    return session;
+  }
+
+
   async function signOut() {
     await supabase.auth.signOut();
     setIsAdmin(false);
@@ -181,6 +214,7 @@ export function AuthProvider({ children }) {
       isAdmin,
       authLoading,
       signIn,
+      signUp,
       signOut,
       claimAdmin,
     }),
