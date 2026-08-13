@@ -33,6 +33,7 @@ export default function AdminPage() {
   );
 
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] =
     useState("");
   const [confirmPassword, setConfirmPassword] =
@@ -105,6 +106,7 @@ export default function AdminPage() {
     setSuccessMessage("");
     setPassword("");
     setConfirmPassword("");
+    setName("");
   }
 
 
@@ -117,6 +119,17 @@ export default function AdminPage() {
 
     const normalizedEmail =
       email.trim().toLowerCase();
+
+    const normalizedName =
+      name.trim();
+
+    if (!normalizedName) {
+      setFormError(
+        "Preencha seu nome."
+      );
+
+      return;
+    }
 
     if (!normalizedEmail || !password) {
       setFormError(
@@ -149,7 +162,8 @@ export default function AdminPage() {
 
       const session = await signUp(
         normalizedEmail,
-        password
+        password,
+        normalizedName
       );
 
       setPassword("");
@@ -328,6 +342,24 @@ export default function AdminPage() {
               }
             >
 
+              {mode === "signup" && (
+                <label className="admin-field">
+                  <span>Nome</span>
+
+                  <input
+                    type="text"
+                    value={name}
+                    autoComplete="name"
+                    placeholder="Seu nome"
+                    onChange={(event) =>
+                      setName(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              )}
+
               <label className="admin-field">
                 <span>E-mail</span>
 
@@ -423,6 +455,27 @@ export default function AdminPage() {
   }
 
 
+  function getDisplayName(user) {
+    const fullName =
+      user?.user_metadata?.full_name
+        ?.trim();
+
+    if (fullName) {
+      return fullName;
+    }
+
+    // Fallback para contas antigas:
+    // usa a parte antes do @ do e-mail.
+    const userEmail =
+      user?.email || "";
+
+    return (
+      userEmail.split("@")[0] ||
+      userEmail
+    );
+  }
+
+
   return (
     <main className="admin-page">
       <section className="admin-hero">
@@ -432,7 +485,7 @@ export default function AdminPage() {
           </span>
 
           <h1>
-            Olá, {session.user.email}!
+            Olá, {getDisplayName(session.user)}!
           </h1>
 
           <p>
