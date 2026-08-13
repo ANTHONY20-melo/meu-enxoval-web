@@ -27,3 +27,5 @@ nosso-casamento-app/
 *.sln
 *.sw?
 
+
+.vercel

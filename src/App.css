@@ -693,10 +693,6 @@
 }
 
 @media (max-width: 650px) {
-  .nav > a:not(.cart-link) {
-    display: none;
-  }
-
   .hero {
     padding: 50px 0;
   }
@@ -1150,10 +1146,6 @@ body {
     gap: 10px;
   }
 
-  .nav > a:not(:last-child) {
-    display: none;
-  }
-
   .cart-link {
     padding: 8px 13px;
     font-size: 0.8rem;
@@ -1541,38 +1533,10 @@ body {
 
     padding-top: 10px;
     padding-bottom: 10px;
-
-    flex-direction: column;
-
-    gap: 9px;
   }
 
   .logo {
     font-size: 1.25rem;
-  }
-
-  .nav {
-    width: 100%;
-
-    display: grid;
-
-    grid-template-columns: 1fr 1fr;
-
-    gap: 8px;
-  }
-
-  .nav-link {
-    width: 100%;
-
-    padding: 10px 8px;
-
-    text-align: center;
-
-    font-size: 0.8rem;
-  }
-
-  .couple-badge {
-    display: none;
   }
 }
 .checklist-error {
@@ -1939,14 +1903,15 @@ body {
 }
 
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 900px) {
   body {
     padding-bottom: 90px;
   }
 
 
   /*
-  ESCONDE O MENU SUPERIOR NO CELULAR
+  ESCONDE O MENU SUPERIOR NO CELULAR/TABLET
+  (a navegação passa para a barra inferior)
   */
 
   .header .nav {
@@ -1955,16 +1920,15 @@ body {
 
 
   /*
-  MENU INFERIOR
+  MENU INFERIOR — uma linha com todos
+  os itens (Início, Enxoval, Casamento,
+  Orçamento, Área do casal)
   */
 
   .mobile-bottom-nav {
     position: fixed;
 
-    display: grid;
-
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
+    display: flex;
 
     left: 12px;
     right: 12px;
@@ -1996,6 +1960,10 @@ body {
 
 
   .mobile-bottom-link {
+    flex: 1 1 0;
+
+    min-width: 0;
+
     display: flex;
 
     flex-direction: column;
@@ -2003,12 +1971,11 @@ body {
     align-items: center;
     justify-content: center;
 
-    min-width: 0;
     min-height: 56px;
 
     gap: 4px;
 
-    padding: 6px;
+    padding: 6px 2px;
 
     border-radius: 13px;
 
@@ -3057,12 +3024,6 @@ body {
   }
 
 
-  .mobile-bottom-nav {
-    grid-template-columns:
-      repeat(4, minmax(0, 1fr));
-  }
-
-
   .mobile-bottom-link {
     font-size: 0.65rem;
   }
@@ -3071,6 +3032,22 @@ body {
 
 
 @media screen and (max-width: 420px) {
+
+  .mobile-bottom-link {
+    font-size: 0.6rem;
+
+    padding: 4px 1px;
+
+    gap: 3px;
+
+    min-height: 52px;
+  }
+
+
+  .mobile-bottom-icon {
+    font-size: 1.15rem;
+  }
+
 
   .budget-summary-grid {
     grid-template-columns: 1fr;
