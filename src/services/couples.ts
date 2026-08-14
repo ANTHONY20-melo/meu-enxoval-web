@@ -51,16 +51,21 @@ export const couplesService = {
     coupleNames: { noiva: string; noivo: string };
     weddingDate: string;
     pixKey?: string;
+    ownerUserId?: string;
   }): Promise<{ coupleId: string; message: string }> {
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) throw new Error('Não autenticado');
+
+    // ownerUserId é usado pelo dono da plataforma (super admin)
+    // para criar o site DE OUTRO usuário. Sem ele, o dono é quem chama.
+    const ownerUserId = params.ownerUserId ?? user.user.id;
 
     const { data, error } = await supabase.rpc('create_couple_from_template', {
       p_slug: params.slug,
       p_couple_names: params.coupleNames,
       p_wedding_date: params.weddingDate,
       p_pix_key: params.pixKey ?? null,
-      p_owner_user_id: user.user.id,
+      p_owner_user_id: ownerUserId,
     });
 
     if (error) {

@@ -1,6 +1,5 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -10,18 +9,19 @@ import {
 
 import { supabase } from "../services/supabase";
 
-import {
-  registerAdminAccount
-} from "../services/api";
-
 
 /*
 Contexto de autenticação do casal.
 
 Controla a sessão do Supabase Auth e informa:
 - session, user, authLoading
-- isAdmin (e-mail na tabela admin_emails)
+- isAdmin (super admin OU dono de um casal)
+- isSuperAdmin (e-mail cadastrado em admin_emails = dono da plataforma)
 - coupleId (do JWT claim `couple_id` ou fallback)
+
+NÃO existe auto-promoção: ninguém vira admin sozinho. O dono da
+plataforma concede a permissão de admin por casal via set_couple_owner
+(no painel de administração do /admin).
 
 O coupleId vem PRIMEIRO do app_metadata do JWT (configurado pelo
 webhook da migration 006). Se o webhook não estiver ativo, cai para
@@ -32,12 +32,12 @@ const AuthContext = createContext({
   session: null,
   user: null,
   isAdmin: false,
+  isSuperAdmin: false,
   authLoading: true,
   coupleId: null,
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
-  claimAdmin: async () => false,
 });
 
 
@@ -48,12 +48,15 @@ export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] =
     useState(false);
 
+  const [isSuperAdmin, setIsSuperAdmin] =
+    useState(false);
+
   const [authLoading, setAuthLoading] =
     useState(true);
 
-  // Evita consultar is_admin() repetidamente
-  // para o mesmo e-mail (bootstrap + evento
-  // INITIAL_SESSION disparam em sequência).
+  // Evita consultar as RPCs de permissão repetidamente
+  // para o mesmo e-mail (bootstrap + evento INITIAL_SESSION
+  // disparam em sequência).
   const lastCheckedEmail =
     useRef(null);
 
@@ -76,9 +79,10 @@ export function AuthProvider({ children }) {
   }
 
 
-  async function refreshAdmin(email) {
+  async function refreshPermissions(email) {
     if (!email) {
       setIsAdmin(false);
+      setIsSuperAdmin(false);
       return;
     }
 
@@ -87,32 +91,34 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const { data, error } =
-        await supabase.rpc("is_admin");
+      const [adminResult, superResult] =
+        await Promise.all([
+          supabase.rpc("is_admin"),
+          supabase.rpc("is_super_admin"),
+        ]);
 
-      if (error) {
-        console.error(
-          "Erro ao verificar admin:",
-          error
-        );
-
-        setIsAdmin(false);
-        return;
-      }
-
-      // Marca apenas APÓS o sucesso: se a RPC
-      // falhar (rede), o próximo chamador pode
+      // Marca apenas APÓS o sucesso: se as RPCs
+      // falharem (rede), o próximo chamador pode
       // tentar de novo (o guard não foi armado).
       lastCheckedEmail.current = email;
 
-      setIsAdmin(data === true);
+      setIsAdmin(
+        !adminResult.error &&
+          adminResult.data === true
+      );
+
+      setIsSuperAdmin(
+        !superResult.error &&
+          superResult.data === true
+      );
     } catch (err) {
       console.error(
-        "Erro ao verificar admin:",
+        "Erro ao verificar permissões:",
         err
       );
 
       setIsAdmin(false);
+      setIsSuperAdmin(false);
     }
   }
 
@@ -156,7 +162,7 @@ export function AuthProvider({ children }) {
 
         const user = data.session?.user ?? null;
 
-        await refreshAdmin(
+        await refreshPermissions(
           user?.email
         );
 
@@ -186,7 +192,7 @@ export function AuthProvider({ children }) {
 
           const user = newSession?.user ?? null;
 
-          refreshAdmin(
+          refreshPermissions(
             user?.email
           );
 
@@ -214,7 +220,7 @@ export function AuthProvider({ children }) {
 
     const user = data.session?.user ?? null;
 
-    await refreshAdmin(
+    await refreshPermissions(
       user?.email
     );
 
@@ -227,89 +233,47 @@ export function AuthProvider({ children }) {
   /**
    * Cadastro do casal direto no site.
    *
-   * 1ª tentativa: via API (conta já nasce com
-   * e-mail confirmado e como administrador).
-   * Fallback (API indisponível): cadastro nativo
-   * do Supabase + claim_admin quando autoconfirmar.
+   * A conta NÃO nasce como administrador: o dono da
+   * plataforma concede a permissão por casal depois
+   * (set_couple_owner no painel de administração).
    *
-   * Retorna { session, created, admin }.
+   * Retorna { session, created, admin: false }.
    */
   async function signUp(
     email,
     password,
     fullName
   ) {
-    try {
-      await registerAdminAccount(
+    const { data, error } =
+      await supabase.auth.signUp({
         email,
         password,
-        fullName
-      );
-
-      // Conta criada pela API: já é admin.
-      // Faz o login automático.
-      const newSession = await signIn(
-        email,
-        password
-      );
-
-      return {
-        session: newSession,
-        created: true,
-        admin: true
-      };
-    } catch (err) {
-      const viaApi =
-        err?.message?.toLowerCase()?.includes(
-          "api"
-        ) ||
-        err?.message?.toLowerCase()?.includes(
-          "network"
-        ) ||
-        err?.message?.toLowerCase()?.includes(
-          "fetch"
-        ) ||
-        err?.message?.toLowerCase()?.includes(
-          "failed"
-        );
-
-      if (!viaApi) {
-        throw err;
-      }
-
-      // Fallback: cria direto no Supabase e tenta
-      // tornar-se administrador em seguida.
-      const { data, error } =
-        await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
+        options: {
+          data: {
+            full_name: fullName,
           },
-        });
+        },
+      });
 
-      if (error) {
-        throw error;
-      }
-
-      const session = data.session || null;
-
-      let admin = false;
-
-      if (session) {
-        admin = await claimAdmin(
-          session.user?.email
-        );
-      }
-
-      return {
-        session,
-        created: true,
-        admin
-      };
+    if (error) {
+      throw error;
     }
+
+    const newSession = data.session || null;
+
+    if (newSession) {
+      await refreshPermissions(
+        newSession.user?.email
+      );
+
+      await resolveCoupleId(newSession.user);
+    }
+
+    return {
+      session: newSession,
+      created: true,
+      admin: false
+    };
   }
 
 
@@ -321,52 +285,10 @@ export function AuthProvider({ children }) {
     lastCheckedEmail.current = null;
 
     setIsAdmin(false);
+    setIsSuperAdmin(false);
     setSession(null);
     setCoupleId(null);
   }
-
-
-  const claimAdmin = useCallback(
-    async (email = session?.user?.email) => {
-      const { data, error } =
-        await supabase.rpc(
-          "claim_admin"
-        );
-
-      if (error) {
-        console.error(
-          "Erro ao reivindicar admin:",
-          error
-        );
-
-        return false;
-      }
-
-      if (data === true) {
-        // refreshAdmin inline (evita dep instável)
-        if (email) {
-          const {
-            data: adminData,
-            error: adminError,
-          } = await supabase.rpc(
-            "is_admin"
-          );
-
-          setIsAdmin(
-            !adminError &&
-              adminData === true
-          );
-        } else {
-          setIsAdmin(false);
-        }
-
-        return true;
-      }
-
-      return false;
-    },
-    [session]
-  );
 
 
   const value = useMemo(
@@ -374,18 +296,18 @@ export function AuthProvider({ children }) {
       session,
       user: session?.user ?? null,
       isAdmin,
+      isSuperAdmin,
       authLoading,
       coupleId,
       signIn,
       signUp,
       signOut,
-      claimAdmin,
     }),
-    // claimAdmin é memoizado; signIn/signUp/signOut
-    // são recriadas a cada render e o provider só
-    // precisa reagir às mudanças de estado abaixo.
+    // signIn/signUp/signOut são recriadas a cada render
+    // e o provider só precisa reagir às mudanças de
+    // estado abaixo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, isAdmin, authLoading, coupleId, claimAdmin]
+    [session, isAdmin, isSuperAdmin, authLoading, coupleId]
   );
 
 

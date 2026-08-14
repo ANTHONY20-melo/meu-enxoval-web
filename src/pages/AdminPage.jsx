@@ -3,10 +3,8 @@ import {
   useState,
 } from "react";
 
-import {
-  Link,
-  useNavigate,
-} from "react-router";
+import { Link }
+  from "react-router";
 
 import { useAuth }
   from "../context/AuthContext";
@@ -17,40 +15,42 @@ import { useCouple }
 import { couplesService }
   from "../services/couples";
 
+import { platformService }
+  from "../services/platform";
+
 import { generateSlug }
   from "../types/couple";
 
 
 /**
- * Área do casal (login/cadastro/logout).
+ * Área do casal (login/cadastro/logout) + painel do
+ * dono da plataforma.
  *
- * Rota /admin. Permite que cada membro do
- * casal crie a própria conta ou entre com
- * e-mail/senha. Os dois primeiros cadastros
- * viram administradores automaticamente.
+ * Rota /admin.
  *
- * Também concentra a criação do site:
- * se o admin ainda não tem casal, mostra o
- * formulário "Criar meu site"; se já tem,
- * mostra o link público para compartilhar.
+ * - Sem sessão: login/cadastro. A conta NÃO nasce admin:
+ *   o dono da plataforma libera o acesso por casal.
+ * - Logado sem permissão: mensagem de aprovação pendente.
+ * - Admin (dono de um casal): mostra o link público do site.
+ * - Super admin (Anthony): painel de gestão — lista quem
+ *   acessa o site, cria o site do casal e concede/revoga
+ *   a permissão de admin (dono) por casal.
  */
 export default function AdminPage() {
   const {
     session,
     isAdmin,
+    isSuperAdmin,
     authLoading,
     signIn,
     signUp,
     signOut,
-    claimAdmin,
   } = useAuth();
 
   const {
     couple,
     refreshCouple,
   } = useCouple();
-
-  const navigate = useNavigate();
 
   const [mode, setMode] = useState(
     "login"
@@ -71,22 +71,30 @@ export default function AdminPage() {
   const [submitting, setSubmitting] =
     useState(false);
 
-  // Formulário de criação do site
+  // Painel de gestão (super admin)
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] =
+    useState(false);
+  const [usersError, setUsersError] =
+    useState("");
+  const [panelMessage, setPanelMessage] =
+    useState("");
+  const [panelError, setPanelError] =
+    useState("");
+
+  // Formulário de criação do site (super admin cria para um usuário)
+  const [selectedUserId, setSelectedUserId] =
+    useState("");
   const [coupleNoiva, setCoupleNoiva] =
     useState("");
-
   const [coupleNoivo, setCoupleNoivo] =
     useState("");
-
   const [coupleDate, setCoupleDate] =
     useState("");
-
   const [pix, setPix] =
     useState("");
-
   const [creating, setCreating] =
     useState(false);
-
   const [createError, setCreateError] =
     useState("");
 
@@ -96,6 +104,47 @@ export default function AdminPage() {
       setFormError("");
     }
   }, [session]);
+
+
+  // Carrega a lista de usuários quando o super admin abre o painel
+  useEffect(() => {
+    if (!session || !isSuperAdmin) {
+      return;
+    }
+
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, isSuperAdmin]);
+
+
+  async function loadUsers() {
+    setLoadingUsers(true);
+    setUsersError("");
+
+    try {
+      const list = await platformService.listUsers();
+      setUsers(list);
+
+      // Seleciona o primeiro usuário sem casal por padrão
+      const firstFree =
+        list.find((u) => !u.couple_id);
+
+      if (firstFree) {
+        setSelectedUserId(firstFree.user_id);
+      }
+    } catch (err) {
+      console.error(
+        "Erro ao carregar usuários:",
+        err
+      );
+
+      setUsersError(
+        "Não foi possível carregar os usuários. Verifique se o SQL atualizado foi aplicado."
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
 
 
   async function handleLogin(event) {
@@ -211,14 +260,9 @@ export default function AdminPage() {
       setPassword("");
       setConfirmPassword("");
 
-      if (result.admin) {
+      if (result.session) {
         setSuccessMessage(
-          "Conta criada! Você agora é um dos administradores."
-        );
-      } else if (result.session) {
-        // Autoconfirm ativo, mas sem admin (limite).
-        setSuccessMessage(
-          "Conta criada! Agora clique em \"Tornar-me administrador\" para liberar a área do casal."
+          "Conta criada! A permissão de acesso será liberada pelo administrador da plataforma."
         );
       } else {
         // Confirmação de e-mail ativa.
@@ -270,50 +314,7 @@ export default function AdminPage() {
       return "Digite um e-mail válido.";
     }
 
-    if (
-      message.includes("já possui conta") ||
-      message.includes("limite de 2 administradores")
-    ) {
-      return message;
-    }
-
     return "Não foi possível criar a conta. Tente novamente.";
-  }
-
-
-  async function handleClaimAdmin() {
-    if (submitting) {
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setFormError("");
-      setSuccessMessage("");
-
-      const ok = await claimAdmin();
-
-      if (ok) {
-        setSuccessMessage(
-          "Você agora é um dos administradores!"
-        );
-      } else {
-        setFormError(
-          "Não foi possível. Verifique se já existem 2 administradores."
-        );
-      }
-    } catch (err) {
-      console.error(
-        "Erro ao reivindicar admin:",
-        err
-      );
-
-      setFormError(
-        "Erro inesperado. Tente novamente."
-      );
-    } finally {
-      setSubmitting(false);
-    }
   }
 
 
@@ -321,6 +322,14 @@ export default function AdminPage() {
     event.preventDefault();
 
     if (creating) {
+      return;
+    }
+
+    if (!selectedUserId) {
+      setCreateError(
+        "Selecione o usuário que será o dono do site."
+      );
+
       return;
     }
 
@@ -346,6 +355,8 @@ export default function AdminPage() {
     try {
       setCreating(true);
       setCreateError("");
+      setPanelMessage("");
+      setPanelError("");
 
       const slug = generateSlug({
         noiva,
@@ -357,11 +368,28 @@ export default function AdminPage() {
         coupleNames: { noiva, noivo },
         weddingDate: coupleDate,
         pixKey: pix.trim() || undefined,
+        ownerUserId: selectedUserId,
       });
 
-      await refreshCouple();
+      const selected =
+        users.find(
+          (u) => u.user_id === selectedUserId
+        );
 
-      navigate("/dashboard");
+      setPanelMessage(
+        `Site criado para ${selected?.email ?? "o usuário"}! Ele agora pode entrar na área do casal.`
+      );
+
+      setCoupleNoiva("");
+      setCoupleNoivo("");
+      setCoupleDate("");
+      setPix("");
+
+      await loadUsers();
+
+      // Se o admin atual (super) ainda não tinha casal próprio,
+      // recarrega o casal do contexto
+      await refreshCouple();
     } catch (err) {
       console.error(
         "Erro ao criar site:",
@@ -389,7 +417,75 @@ export default function AdminPage() {
       return "Este endereço já está em uso. Tente nomes diferentes.";
     }
 
+    if (
+      message.includes("sem permissão")
+    ) {
+      return "Você não tem permissão para criar sites.";
+    }
+
     return "Não foi possível criar o site. Tente novamente.";
+  }
+
+
+  async function handleSetOwner(userId, coupleId) {
+    if (submitting) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setPanelError("");
+      setPanelMessage("");
+
+      const ok = await platformService.setCoupleOwner(
+        userId,
+        coupleId
+      );
+
+      if (ok) {
+        setPanelMessage(
+          "Permissão de admin concedida para o casal!"
+        );
+
+        await loadUsers();
+      } else {
+        setPanelError(
+          "Não foi possível conceder a permissão."
+        );
+      }
+    } catch (err) {
+      console.error(
+        "Erro ao definir dono:",
+        err
+      );
+
+      setPanelError(
+        "Erro inesperado ao definir o dono."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+
+  function getDisplayName(user) {
+    const fullName =
+      user?.user_metadata?.full_name
+        ?.trim();
+
+    if (fullName) {
+      return fullName;
+    }
+
+    // Fallback para contas antigas:
+    // usa a parte antes do @ do e-mail.
+    const userEmail =
+      user?.email || "";
+
+    return (
+      userEmail.split("@")[0] ||
+      userEmail
+    );
   }
 
 
@@ -424,7 +520,7 @@ export default function AdminPage() {
             <p>
               {mode === "login"
                 ? "Esta área é privada. Use o e-mail e a senha combinados."
-                : "Os dois primeiros cadastros viram administradores automaticamente."}
+                : "Crie a conta com o e-mail do casal. Um administrador liberará o acesso ao site."}
             </p>
           </div>
         </section>
@@ -576,7 +672,7 @@ export default function AdminPage() {
             <p className="admin-hint">
               {mode === "login"
                 ? "Ainda não tem conta? Use a aba \"Criar conta\" para cadastrar o e-mail do casal."
-                : "Crie a conta com o e-mail do casal. Depois de entrar, clique em \"Tornar-me administrador\"."}
+                : "Depois do cadastro, o administrador da plataforma libera o acesso ao site do casal."}
             </p>
 
           </div>
@@ -586,27 +682,337 @@ export default function AdminPage() {
   }
 
 
-  function getDisplayName(user) {
-    const fullName =
-      user?.user_metadata?.full_name
-        ?.trim();
-
-    if (fullName) {
-      return fullName;
-    }
-
-    // Fallback para contas antigas:
-    // usa a parte antes do @ do e-mail.
-    const userEmail =
-      user?.email || "";
-
+  // Painel do super admin: gestão de usuários e casais
+  if (isSuperAdmin) {
     return (
-      userEmail.split("@")[0] ||
-      userEmail
+      <main className="admin-page">
+        <section className="admin-hero">
+          <div className="container">
+            <span className="checklist-label">
+              🔒 Administração da plataforma
+            </span>
+
+            <h1>
+              Olá, {getDisplayName(session.user)}!
+            </h1>
+
+            <p>
+              Você é o administrador da plataforma.
+              Aqui você controla quem acessa o site
+              e concede a permissão de admin por casal.
+            </p>
+          </div>
+        </section>
+
+        <section className="admin-section">
+          <div className="container">
+
+            {panelMessage && (
+              <p className="admin-success">
+                {panelMessage}
+              </p>
+            )}
+
+            {panelError && (
+              <p className="admin-error">
+                {panelError}
+              </p>
+            )}
+
+            {usersError && (
+              <p className="admin-error">
+                {usersError}
+              </p>
+            )}
+
+            <div className="admin-panel">
+
+              <h3>
+                👥 Usuários que acessam o site
+              </h3>
+
+              {loadingUsers ? (
+                <p className="admin-hint">
+                  Carregando usuários...
+                </p>
+              ) : users.length === 0 ? (
+                <p className="admin-hint">
+                  Nenhum usuário cadastrado ainda.
+                </p>
+              ) : (
+                <div className="admin-user-list">
+
+                  {users.map((u) => {
+                    const coupleLabel =
+                      u.couple_names
+                        ? `${u.couple_names.noiva} & ${u.couple_names.noivo}`
+                        : null;
+
+                    return (
+                      <div
+                        key={u.user_id}
+                        className="admin-user-row"
+                      >
+
+                        <div className="admin-user-info">
+                          <strong>
+                            {u.full_name ||
+                              u.email}
+                          </strong>
+
+                          <span>
+                            {u.email}
+                          </span>
+
+                          {coupleLabel ? (
+                            <span className="admin-user-couple">
+                              💍 {coupleLabel}
+                              {u.couple_slug
+                                ? ` (/${u.couple_slug})`
+                                : ""}
+                            </span>
+                          ) : (
+                            <span className="admin-user-couple muted">
+                              Sem casal ainda
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="admin-user-actions">
+                          {!u.couple_id ? (
+                            <button
+                              type="button"
+                              className="admin-btn-small"
+                              onClick={() => {
+                                setSelectedUserId(
+                                  u.user_id
+                                );
+                                setCreateError("");
+                                setPanelError("");
+                              }}
+                            >
+                              ➕ Criar site
+                            </button>
+                          ) : u.is_owner ? (
+                            <span className="admin-badge">
+                              👑 Dono
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-btn-small"
+                              disabled={submitting}
+                              onClick={() =>
+                                handleSetOwner(
+                                  u.user_id,
+                                  u.couple_id
+                                )
+                              }
+                            >
+                              👑 Tornar dono
+                            </button>
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })}
+
+                </div>
+              )}
+
+              {/* Formulário: criar site para um usuário */}
+              {users.length > 0 && (
+                <div className="admin-create-site">
+                  <h3>
+                    🌐 Criar site para um usuário
+                  </h3>
+
+                  <form
+                    className="admin-form"
+                    onSubmit={handleCreateSite}
+                  >
+
+                    <label className="admin-field">
+                      <span>Usuário dono do site</span>
+
+                      <select
+                        value={selectedUserId}
+                        onChange={(event) => {
+                          setSelectedUserId(
+                            event.target.value
+                          );
+                          setCreateError("");
+                        }}
+                      >
+                        {users
+                          .filter((u) => !u.couple_id)
+                          .map((u) => (
+                            <option
+                              key={u.user_id}
+                              value={u.user_id}
+                            >
+                              {u.full_name || u.email} — {u.email}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+
+                    <label className="admin-field">
+                      <span>Nome da noiva</span>
+
+                      <input
+                        type="text"
+                        value={coupleNoiva}
+                        placeholder="Ex: Ana"
+                        onChange={(event) =>
+                          setCoupleNoiva(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="admin-field">
+                      <span>Nome do noivo</span>
+
+                      <input
+                        type="text"
+                        value={coupleNoivo}
+                        placeholder="Ex: Pedro"
+                        onChange={(event) =>
+                          setCoupleNoivo(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="admin-field">
+                      <span>Data do casamento</span>
+
+                      <input
+                        type="date"
+                        value={coupleDate}
+                        onChange={(event) =>
+                          setCoupleDate(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="admin-field">
+                      <span>
+                        Chave PIX (opcional)
+                      </span>
+
+                      <input
+                        type="text"
+                        value={pix}
+                        placeholder="Chave para contribuições"
+                        onChange={(event) =>
+                          setPix(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    {createError && (
+                      <p className="admin-error">
+                        {createError}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="admin-submit-button"
+                      disabled={creating}
+                    >
+                      {creating
+                        ? "Criando..."
+                        : "Criar site do casal"}
+                    </button>
+
+                  </form>
+                </div>
+              )}
+
+            </div>
+
+            <button
+              type="button"
+              className="admin-logout-button"
+              disabled={submitting}
+              onClick={async () => {
+                await signOut();
+                setEmail("");
+                setMode("login");
+              }}
+            >
+              Sair
+            </button>
+
+          </div>
+        </section>
+      </main>
     );
   }
 
 
+  // Usuário logado sem permissão: aguardando aprovação
+  if (!isAdmin || !couple) {
+    return (
+      <main className="admin-page">
+        <section className="admin-hero">
+          <div className="container">
+            <span className="checklist-label">
+              🔒 Área do casal
+            </span>
+
+            <h1>
+              Olá, {getDisplayName(session.user)}!
+            </h1>
+
+            <p>
+              Seu acesso ainda não foi liberado.
+              O administrador da plataforma cria o
+              site do casal e concede a permissão de
+              admin. Assim que liberar, você entra
+              aqui e gerencia tudo.
+            </p>
+          </div>
+        </section>
+
+        <section className="admin-section">
+          <div className="container">
+            <div className="admin-actions">
+              <p className="admin-hint">
+                ⏳ Aguardando liberação do administrador...
+              </p>
+
+              <button
+                type="button"
+                className="admin-logout-button"
+                disabled={submitting}
+                onClick={async () => {
+                  await signOut();
+                  setEmail("");
+                  setMode("login");
+                }}
+              >
+                Sair
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+
+  // Admin (dono do casal) com site pronto
   return (
     <main className="admin-page">
       <section className="admin-hero">
@@ -621,7 +1027,7 @@ export default function AdminPage() {
 
           <p>
             {isAdmin
-              ? "Você é um dos administradores."
+              ? "Você é o administrador do site do casal."
               : "Você ainda não é administrador."}
           </p>
         </div>
@@ -630,135 +1036,9 @@ export default function AdminPage() {
       <section className="admin-section">
         <div className="container">
 
-          {formError && (
-            <p className="admin-error">
-              {formError}
-            </p>
-          )}
-
-          {successMessage && (
-            <p className="admin-success">
-              {successMessage}
-            </p>
-          )}
-
           <div className="admin-actions">
 
-            {!isAdmin && (
-              <button
-                type="button"
-                className="admin-submit-button"
-                disabled={submitting}
-                onClick={handleClaimAdmin}
-              >
-                {submitting
-                  ? "Processando..."
-                  : "Tornar-me administrador"}
-              </button>
-            )}
-
-            {isAdmin && !couple && (
-              <div className="admin-create-site">
-
-                <h3>
-                  🌐 Crie seu site de casamento
-                </h3>
-
-                <p>
-                  Seu site sai na hora: lista de
-                  presentes pronta, link público
-                  para os convidados e painel de
-                  reservas.
-                </p>
-
-                <form
-                  className="admin-form"
-                  onSubmit={handleCreateSite}
-                >
-
-                  <label className="admin-field">
-                    <span>Nome da noiva</span>
-
-                    <input
-                      type="text"
-                      value={coupleNoiva}
-                      placeholder="Ex: Ana"
-                      onChange={(event) =>
-                        setCoupleNoiva(
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="admin-field">
-                    <span>Nome do noivo</span>
-
-                    <input
-                      type="text"
-                      value={coupleNoivo}
-                      placeholder="Ex: Pedro"
-                      onChange={(event) =>
-                        setCoupleNoivo(
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="admin-field">
-                    <span>Data do casamento</span>
-
-                    <input
-                      type="date"
-                      value={coupleDate}
-                      onChange={(event) =>
-                        setCoupleDate(
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="admin-field">
-                    <span>
-                      Chave PIX (opcional)
-                    </span>
-
-                    <input
-                      type="text"
-                      value={pix}
-                      placeholder="Chave para contribuições"
-                      onChange={(event) =>
-                        setPix(
-                          event.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  {createError && (
-                    <p className="admin-error">
-                      {createError}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="admin-submit-button"
-                    disabled={creating}
-                  >
-                    {creating
-                      ? "Criando..."
-                      : "Criar meu site"}
-                  </button>
-
-                </form>
-
-              </div>
-            )}
-
-            {isAdmin && couple && (
+            {couple && (
               <div className="admin-site-ready">
 
                 <h3>
