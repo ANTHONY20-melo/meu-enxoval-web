@@ -278,10 +278,9 @@ BEGIN
   SELECT
     u.id AS user_id,
     u.email::text AS email,
-    COALESCE(
-      p.full_name,
-      u.raw_user_meta_data->>'full_name'
-    ) AS full_name,
+    -- O nome do usuário vive em raw_user_meta_data (auth.users),
+    -- não na tabela public.profiles (que só tem id + couple_id).
+    u.raw_user_meta_data->>'full_name' AS full_name,
     p.couple_id AS couple_id,
     c.slug AS couple_slug,
     c.couple_names AS couple_names,
@@ -289,11 +288,11 @@ BEGIN
       SELECT 1 FROM public.couples c2
       WHERE c2.owner_user_id = u.id
     ) AS is_owner,
-    COALESCE(p.created_at, u.created_at) AS created_at
+    u.created_at AS created_at
   FROM auth.users u
   LEFT JOIN public.profiles p ON p.id = u.id
   LEFT JOIN public.couples c ON c.id = p.couple_id
-  ORDER BY COALESCE(p.created_at, u.created_at) DESC;
+  ORDER BY u.created_at DESC;
 END;
 $$;
 
