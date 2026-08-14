@@ -19,9 +19,8 @@ Controla a sessão do Supabase Auth e informa:
 - isSuperAdmin (e-mail cadastrado em admin_emails = dono da plataforma)
 - coupleId (do JWT claim `couple_id` ou fallback)
 
-NÃO existe auto-promoção: ninguém vira admin sozinho. O dono da
-plataforma concede a permissão de admin por casal via set_couple_owner
-(no painel de administração do /admin).
+Auto-promoção controlada: o self-service (primeiro acesso) cria o
+próprio site e vira dono; o super admin concede/revoga para terceiros.
 
 O coupleId vem PRIMEIRO do app_metadata do JWT (configurado pelo
 webhook da migration 006). Se o webhook não estiver ativo, cai para
@@ -79,14 +78,17 @@ export function AuthProvider({ children }) {
   }
 
 
-  async function refreshPermissions(email) {
+  async function refreshPermissions(email, force = false) {
     if (!email) {
       setIsAdmin(false);
       setIsSuperAdmin(false);
       return;
     }
 
-    if (lastCheckedEmail.current === email) {
+    // Dedupe: evita re-consultar as RPCs para o mesmo e-mail.
+    // force=true ignora (necessário APÓS criar o casal: o usuário
+    // passou de "sem casal" para "dono" e o is_admin mudou).
+    if (!force && lastCheckedEmail.current === email) {
       return;
     }
 
@@ -302,6 +304,10 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signOut,
+      // Re-consulta is_admin/is_super_admin forçando o dedupe
+      // (necessário depois de criar o próprio site: o usuário
+      // passa a ser dono e isAdmin muda de false para true).
+      refreshPermissions,
     }),
     // signIn/signUp/signOut são recriadas a cada render
     // e o provider só precisa reagir às mudanças de

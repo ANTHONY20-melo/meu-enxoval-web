@@ -46,6 +46,7 @@ export default function AdminPage() {
     signIn,
     signUp,
     signOut,
+    refreshPermissions,
   } = useAuth();
 
   const {
@@ -474,7 +475,14 @@ export default function AdminPage() {
       });
 
       // O site nasce com o dono = usuário logado:
-      // o contexto carrega o casal na hora.
+      // 1) re-consulta is_admin (o dedupe do AuthContext
+      //    impediria a atualização — force=true ignora);
+      // 2) o contexto de casal carrega o site na hora.
+      await refreshPermissions(
+        session.user.email,
+        true
+      );
+
       await refreshCouple();
 
       setSuccessMessage(
