@@ -822,7 +822,8 @@ export default function AdminPage() {
               )}
 
               {/* Formulário: criar site para um usuário */}
-              {users.length > 0 && (
+              {users.filter((u) => !u.couple_id)
+                .length > 0 && (
                 <div className="admin-create-site">
                   <h3>
                     🌐 Criar site para um usuário
