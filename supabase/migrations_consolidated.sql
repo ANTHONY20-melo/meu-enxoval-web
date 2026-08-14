@@ -467,23 +467,71 @@ AS $$
   );
 $$;
 
--- Busca casal por slug (público — sem owner_user_id)
+-- Busca casal por slug: ANON vê tudo (site público para convidados);
+-- SUPER ADMIN vê tudo; USER autenticado só vê o PRÓPRIO casal.
 CREATE OR REPLACE FUNCTION public.get_couple_by_slug(p_slug varchar)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT jsonb_build_object(
-    'id', id,
-    'slug', slug,
-    'couple_names', couple_names,
-    'wedding_date', wedding_date,
-    'pix_key', pix_key,
-    'settings', settings,
-    'created_at', created_at,
-    'updated_at', updated_at
-  )
+DECLARE
+  v_couple record;
+  v_user_couple_id uuid;
+BEGIN
+  -- Busca o casal
+  SELECT * INTO v_couple
   FROM public.couples
   WHERE slug = p_slug;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  -- Anon (convidados) = acesso total ao site público
+  IF auth.uid() IS NULL THEN
+    RETURN jsonb_build_object(
+      'id', v_couple.id,
+      'slug', v_couple.slug,
+      'couple_names', v_couple.couple_names,
+      'wedding_date', v_couple.wedding_date,
+      'pix_key', v_couple.pix_key,
+      'settings', v_couple.settings,
+      'created_at', v_couple.created_at,
+      'updated_at', v_couple.updated_at
+    );
+  END IF;
+
+  -- Super admin = vê tudo
+  IF public.is_super_admin() THEN
+    RETURN jsonb_build_object(
+      'id', v_couple.id,
+      'slug', v_couple.slug,
+      'couple_names', v_couple.couple_names,
+      'wedding_date', v_couple.wedding_date,
+      'pix_key', v_couple.pix_key,
+      'settings', v_couple.settings,
+      'created_at', v_couple.created_at,
+      'updated_at', v_couple.updated_at
+    );
+  END IF;
+
+  -- Usuário autenticado = só o próprio casal
+  v_user_couple_id := public.current_user_couple_id();
+  IF v_user_couple_id = v_couple.id THEN
+    RETURN jsonb_build_object(
+      'id', v_couple.id,
+      'slug', v_couple.slug,
+      'couple_names', v_couple.couple_names,
+      'wedding_date', v_couple.wedding_date,
+      'pix_key', v_couple.pix_key,
+      'settings', v_couple.settings,
+      'created_at', v_couple.created_at,
+      'updated_at', v_couple.updated_at
+    );
+  END IF;
+
+  -- Não é o próprio casal → sem acesso
+  RETURN NULL;
+END;
 $$;
 
 -- Cria casal a partir do template (clona checklist + budget do casal

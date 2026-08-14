@@ -3549,6 +3549,8 @@ body {
 }
 
 .admin-field input {
+  width: 100%;
+  min-width: 0;
   padding: 0.65rem 0.8rem;
 
   border: 1px solid var(--border, #e8d9da);
@@ -4531,7 +4533,8 @@ body {
 
   font-size: 0.82rem;
 
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-user-couple {
@@ -4607,7 +4610,7 @@ body {
 }
 
 /* ============================================================
-   MODAL DE EDIÇÃO DE USUÁRIO (super admin) + PAINEL DE ACESSO
+   MODAL DE EDIï¿½ï¿½O DE USUï¿½RIO (super admin) + PAINEL DE ACESSO
    ============================================================ */
 
 .admin-access-panel {
@@ -4722,7 +4725,12 @@ body {
 
   font-size: 0.85rem;
 
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.eu-user-summary {
+  min-width: 0;
 }
 
 .eu-modal-body h4 {
@@ -4832,7 +4840,8 @@ body {
 
   font-size: 0.78rem;
 
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .couple-access-badge {
