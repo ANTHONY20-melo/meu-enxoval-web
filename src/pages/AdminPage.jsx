@@ -452,6 +452,7 @@ export default function AdminPage() {
                     ? "Entrar"
                     : "Criar conta"}
               </button>
+            </form>
 
             <p className="admin-hint">
               {mode === "login"
