@@ -65,11 +65,20 @@ export default function Landing() {
       {/* HERO */}
 
       <section className="landing-hero">
-        <div
-          className="landing-hero-bg"
-          role="img"
-          aria-label="Cerimônia de casamento na praia ao pôr do sol"
-        />
+        <video
+          className="landing-hero-video"
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/images/landing-hero.jpg"
+          aria-hidden="true"
+        >
+          <source
+            src="/videos/landing-hero.mp4"
+            type="video/mp4"
+          />
+        </video>
         <div className="landing-hero-overlay" />
         <Petals />
 

@@ -202,7 +202,9 @@ AS $$
   );
 $$;
 
--- É admin? Super admin (controla tudo) OU dono de um casal
+-- É admin? Super admin (controla tudo) OU dono de um casal OU membro
+-- liberado pelo dono (profiles.couple_id preenchido) — a esposa/noivo
+-- ganha o painel do casal pelo e-mail liberado pelo dono.
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
@@ -211,6 +213,10 @@ AS $$
     OR EXISTS (
       SELECT 1 FROM public.couples
       WHERE owner_user_id = auth.uid()
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND couple_id IS NOT NULL
     );
 $$;
 
@@ -268,6 +274,8 @@ RETURNS TABLE(
   couple_id uuid,
   couple_slug text,
   couple_names jsonb,
+  couple_wedding_date date,
+  pix_key text,
   is_owner boolean,
   created_at timestamptz
 ) LANGUAGE plpgsql SECURITY DEFINER
@@ -290,6 +298,8 @@ BEGIN
     -- RETURNS TABLE declara text — Postgres exige tipo exato (42804).
     c.slug::text AS couple_slug,
     c.couple_names AS couple_names,
+    c.wedding_date AS couple_wedding_date,
+    c.pix_key::text AS pix_key,
     EXISTS (
       SELECT 1 FROM public.couples c2
       WHERE c2.owner_user_id = u.id
@@ -299,6 +309,146 @@ BEGIN
   LEFT JOIN public.profiles p ON p.id = u.id
   LEFT JOIN public.couples c ON c.id = p.couple_id
   ORDER BY u.created_at DESC;
+END;
+$$;
+
+-- Libera o acesso da esposa/noivo ao casal (super admin OU dono).
+-- Procura o usuário pelo e-mail; se não tiver conta, avisa para criar.
+CREATE OR REPLACE FUNCTION public.grant_couple_access(
+  p_couple_id uuid,
+  p_email text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_full_name text;
+BEGIN
+  IF NOT (public.is_super_admin() OR EXISTS (
+    SELECT 1 FROM public.couples
+    WHERE id = p_couple_id AND owner_user_id = auth.uid()
+  )) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Sem permissão.');
+  END IF;
+
+  IF p_email IS NULL OR length(trim(p_email)) < 3 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Informe um e-mail válido.');
+  END IF;
+
+  SELECT u.id, u.raw_user_meta_data->>'full_name'
+    INTO v_user_id, v_full_name
+    FROM auth.users u
+   WHERE lower(u.email) = lower(trim(p_email))
+   LIMIT 1;
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'error', 'Nenhuma conta com este e-mail. Peça para a pessoa criar a conta primeiro.'
+    );
+  END IF;
+
+  INSERT INTO public.profiles (id, couple_id)
+  VALUES (v_user_id, p_couple_id)
+  ON CONFLICT (id) DO UPDATE SET couple_id = EXCLUDED.couple_id;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'user_id', v_user_id,
+    'full_name', COALESCE(v_full_name, v_user_id::text)
+  );
+END;
+$$;
+
+-- Remove o acesso de um membro do casal (super admin OU dono)
+CREATE OR REPLACE FUNCTION public.revoke_couple_access(p_user_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_couple_id uuid;
+BEGIN
+  SELECT couple_id INTO v_couple_id
+  FROM public.profiles
+  WHERE id = p_user_id;
+
+  IF v_couple_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF NOT (public.is_super_admin() OR EXISTS (
+    SELECT 1 FROM public.couples
+    WHERE id = v_couple_id AND owner_user_id = auth.uid()
+  )) THEN
+    RETURN false;
+  END IF;
+
+  -- O dono não pode ser removido (só o super admin via set_couple_owner)
+  IF EXISTS (
+    SELECT 1 FROM public.couples
+    WHERE id = v_couple_id AND owner_user_id = p_user_id
+  ) THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.profiles SET couple_id = NULL WHERE id = p_user_id;
+
+  RETURN true;
+END;
+$$;
+
+-- Lista os membros com acesso ao casal (super admin OU dono)
+CREATE OR REPLACE FUNCTION public.list_couple_members(p_couple_id uuid)
+RETURNS TABLE(user_id uuid, email text, full_name text, is_owner boolean)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT (public.is_super_admin() OR EXISTS (
+    SELECT 1 FROM public.couples
+    WHERE id = p_couple_id AND owner_user_id = auth.uid()
+  )) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+    SELECT
+      u.id,
+      u.email::text AS email,
+      u.raw_user_meta_data->>'full_name' AS full_name,
+      (c.owner_user_id = u.id) AS is_owner
+    FROM public.profiles p
+    JOIN auth.users u ON u.id = p.id
+    JOIN public.couples c ON c.id = p.couple_id
+    WHERE p.couple_id = p_couple_id
+    ORDER BY (c.owner_user_id = u.id) DESC, u.created_at ASC;
+END;
+$$;
+
+-- Edita dados do casal (nomes, data, PIX) — super admin OU dono
+CREATE OR REPLACE FUNCTION public.update_couple(
+  p_couple_id uuid,
+  p_couple_names jsonb,
+  p_wedding_date date,
+  p_pix_key varchar DEFAULT NULL
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT (public.is_super_admin() OR EXISTS (
+    SELECT 1 FROM public.couples
+    WHERE id = p_couple_id AND owner_user_id = auth.uid()
+  )) THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.couples
+     SET couple_names = p_couple_names,
+         wedding_date = p_wedding_date,
+         pix_key = NULLIF(trim(COALESCE(p_pix_key, '')), '')
+   WHERE id = p_couple_id;
+
+  RETURN FOUND;
 END;
 $$;
 
@@ -536,10 +686,17 @@ ALTER TABLE public.couple_checklist ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.couple_budget ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gift_reservations ENABLE ROW LEVEL SECURITY;
 
--- couples: dono pode tudo (select público via RPC get_couple_by_slug)
+-- couples: dono OU membro liberado (profiles.couple_id) pode tudo;
+-- a criação/edição via RLS fica só com o dono (WITH CHECK owner)
 DROP POLICY IF EXISTS "owner_all" ON public.couples;
 CREATE POLICY "owner_all" ON public.couples
-  FOR ALL USING (owner_user_id = auth.uid())
+  FOR ALL USING (
+    owner_user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.couple_id = public.couples.id
+    )
+  )
   WITH CHECK (owner_user_id = auth.uid());
 
 -- couple_checklist: dono do casal vê/tudo
@@ -569,6 +726,10 @@ GRANT EXECUTE ON FUNCTION public.create_couple_from_template(varchar, jsonb, dat
 GRANT EXECUTE ON FUNCTION public.is_super_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_couple_owner(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_couple_access(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_couple_access(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.list_couple_members(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_couple(uuid, jsonb, date, varchar) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_platform_users() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.reserve_gift(text, text, uuid) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_gift(text, text, uuid) TO anon, authenticated;

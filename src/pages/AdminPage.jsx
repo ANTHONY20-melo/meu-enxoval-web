@@ -21,6 +21,12 @@ import { platformService }
 import { generateSlug }
   from "../types/couple";
 
+import EditUserModal
+  from "../components/EditUserModal";
+
+import CoupleAccessPanel
+  from "../components/CoupleAccessPanel";
+
 
 /**
  * Área do casal (login/cadastro/logout) + painel do
@@ -99,6 +105,10 @@ export default function AdminPage() {
     useState(false);
   const [createError, setCreateError] =
     useState("");
+
+  // Modal de edição de usuário (super admin)
+  const [editingUser, setEditingUser] =
+    useState(null);
 
 
   useEffect(() => {
@@ -855,6 +865,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="admin-user-actions">
+                          <button
+                            type="button"
+                            className="admin-btn-small"
+                            onClick={() => {
+                              setEditingUser(u);
+                              setPanelError("");
+                            }}
+                          >
+                            ✏️ Editar
+                          </button>
+
                           {!u.couple_id ? (
                             <button
                               type="button"
@@ -1033,6 +1054,14 @@ export default function AdminPage() {
 
           </div>
         </section>
+
+        {editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onChanged={loadUsers}
+          />
+        )}
       </main>
     );
   }
@@ -1256,6 +1285,20 @@ export default function AdminPage() {
                     Editar enxoval →
                   </Link>
 
+                </div>
+
+                <div className="admin-access-panel">
+                  <h4>
+                    💞 Liberar acesso para a esposa/noivo
+                  </h4>
+
+                  <p className="admin-hint">
+                    Sua esposa/noivo cria a conta dela com o
+                    e-mail abaixo e passa a gerenciar o site
+                    junto com você.
+                  </p>
+
+                  <CoupleAccessPanel coupleId={couple.id} />
                 </div>
 
               </div>

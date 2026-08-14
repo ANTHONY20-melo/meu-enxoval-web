@@ -115,8 +115,15 @@ export function CoupleProvider({ children }: { children: React.ReactNode }) {
     error,
     refreshCouple: async () => {
       if (user) {
-        const data = await couplesService.getMyCouple(user.id);
-        setCouple(data);
+        const data = authCoupleId
+          ? await supabase
+              .from("couples")
+              .select("*")
+              .eq("id", authCoupleId)
+              .maybeSingle()
+              .then(r => r.data)
+          : await couplesService.getMyCouple(user.id);
+        setCouple(data ?? null);
       }
     },
   }), [couple, authCoupleId, loading, error, user]);

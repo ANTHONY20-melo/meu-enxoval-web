@@ -3726,15 +3726,17 @@ body {
   color: #ffffff;
 }
 
-/* Fundo: altar + corredor na praia ao p√¥r do sol */
-.landing-hero-bg {
+/* Fundo: v√≠deo da cerim√¥nia na praia (object-fit cover =
+   preenche sem distorcer, cortando as bordas) */
+.landing-hero-video {
   position: absolute;
   inset: 0;
 
-  background-image: url("/images/landing-hero.jpg");
+  width: 100%;
+  height: 100%;
 
-  background-size: cover;
-  background-position: center 38%;
+  object-fit: cover;
+  object-position: center 40%;
 
   animation: landing-kenburns 26s ease-in-out infinite alternate;
 
@@ -4190,7 +4192,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-hero-bg,
+  .landing-hero-video,
   .landing-petal,
   .landing-hero-content,
   .reveal {
@@ -4438,8 +4440,8 @@ body {
     padding: 72px 0 52px;
   }
 
-  .landing-hero-bg {
-    background-position: center 30%;
+  .landing-hero-video {
+    object-position: center 30%;
   }
 
   .landing-steps {
@@ -4602,4 +4604,280 @@ body {
 
 .admin-form select:focus {
   border-color: #c98a92;
+}
+
+/* ============================================================
+   MODAL DE EDI«√O DE USU¡RIO (super admin) + PAINEL DE ACESSO
+   ============================================================ */
+
+.admin-access-panel {
+  margin-top: 22px;
+
+  padding: 16px;
+
+  background: #fdf9f7;
+
+  border: 1px solid #f1ded9;
+  border-radius: 0.8rem;
+}
+
+.admin-access-panel h4 {
+  margin: 0 0 6px;
+
+  color: #583f43;
+
+  font-size: 1rem;
+}
+
+.eu-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+
+  padding: 5vh 16px;
+
+  background: rgba(27, 29, 39, 0.55);
+
+  overflow-y: auto;
+}
+
+.eu-modal-card {
+  width: 100%;
+  max-width: 520px;
+
+  background: #fffaf8;
+
+  border-radius: 1rem;
+
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.eu-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 16px 18px;
+
+  background: #583f43;
+
+  color: #ffffff;
+
+  border-radius: 1rem 1rem 0 0;
+}
+
+.eu-modal-header h3 {
+  margin: 0;
+
+  font-size: 1.05rem;
+}
+
+.eu-modal-close {
+  width: 34px;
+  height: 34px;
+
+  background: rgba(255, 255, 255, 0.15);
+
+  color: #ffffff;
+
+  font-size: 1.4rem;
+  line-height: 1;
+
+  border: none;
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  transition: background 0.2s ease;
+}
+
+.eu-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.eu-modal-body {
+  padding: 18px;
+}
+
+.eu-user-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  margin-bottom: 14px;
+}
+
+.eu-user-summary strong {
+  color: #583f43;
+
+  font-size: 1rem;
+}
+
+.eu-user-summary span {
+  color: #8a6a6a;
+
+  font-size: 0.85rem;
+
+  word-break: break-all;
+}
+
+.eu-modal-body h4 {
+  margin: 18px 0 10px;
+
+  color: #583f43;
+
+  font-size: 0.95rem;
+}
+
+.eu-modal-body .admin-form h4 {
+  margin-top: 0;
+}
+
+.eu-access-section {
+  margin-top: 8px;
+
+  padding-top: 8px;
+
+  border-top: 1px dashed #f1ded9;
+}
+
+.couple-access-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.couple-access-form .admin-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.couple-access-hint {
+  margin: 10px 0 6px;
+
+  color: #8a6a6a;
+
+  font-size: 0.82rem;
+
+  line-height: 1.45;
+}
+
+.couple-access-members {
+  margin-top: 14px;
+}
+
+.couple-access-members h4 {
+  margin: 0 0 8px;
+
+  color: #583f43;
+
+  font-size: 0.9rem;
+}
+
+.couple-access-empty {
+  margin: 0;
+
+  color: #a38b8b;
+
+  font-size: 0.85rem;
+
+  font-style: italic;
+}
+
+.couple-access-list {
+  list-style: none;
+
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.couple-access-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 10px 12px;
+
+  background: #ffffff;
+
+  border: 1px solid #f1ded9;
+  border-radius: 0.6rem;
+}
+
+.couple-access-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  min-width: 0;
+}
+
+.couple-access-info strong {
+  color: #583f43;
+
+  font-size: 0.9rem;
+}
+
+.couple-access-info small {
+  color: #8a6a6a;
+
+  font-size: 0.78rem;
+
+  word-break: break-all;
+}
+
+.couple-access-badge {
+  flex-shrink: 0;
+
+  padding: 0.35rem 0.6rem;
+
+  background: #fdf6f4;
+
+  color: #a95f6b;
+
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  border: 1px solid #f1ded9;
+  border-radius: 0.6rem;
+}
+
+.couple-access-remove {
+  flex-shrink: 0;
+
+  padding: 0.35rem 0.7rem;
+
+  background: #fbe9e7;
+
+  color: #b0483f;
+
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  border: 1px solid #efc7c2;
+  border-radius: 0.6rem;
+
+  cursor: pointer;
+
+  transition: background 0.2s ease;
+}
+
+.couple-access-remove:hover {
+  background: #f3d4d0;
+}
+
+@media (max-width: 560px) {
+  .couple-access-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
