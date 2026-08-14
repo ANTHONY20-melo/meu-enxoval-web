@@ -9,21 +9,20 @@ export const couplesService = {
    * Retorna null se não encontrado.
    */
   async getMyCouple(userId: string): Promise<Couple | null> {
+    // maybeSingle: com RLS e 0 linhas retorna null SEM erro 406
+    // (single() gerava "Failed to load resource: 406" no console para
+    //  usuários que ainda não têm casal criado pelo super admin)
     const { data, error } = await supabase
       .from('couples')
       .select('*')
       .eq('owner_user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // 'single' falhou porque não encontrou linha única -> retorna null
-        return null;
-      }
       console.error('Erro ao buscar casal:', error);
       throw error;
     }
-    return data as Couple;
+    return data as Couple | null;
   },
 
   /**
