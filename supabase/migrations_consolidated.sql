@@ -256,6 +256,10 @@ END;
 $$;
 
 -- Lista quem acessa o site (só super admin) — para o painel de gestão
+-- DROP antes do CREATE: o CREATE OR REPLACE NÃO altera a assinatura de
+-- retorno de função existente (erro 42804 "structure of query does not
+-- match function result type" ao trocar o tipo de uma coluna).
+DROP FUNCTION IF EXISTS public.list_platform_users();
 CREATE OR REPLACE FUNCTION public.list_platform_users()
 RETURNS TABLE(
   user_id uuid,
@@ -282,7 +286,9 @@ BEGIN
     -- não na tabela public.profiles (que só tem id + couple_id).
     u.raw_user_meta_data->>'full_name' AS full_name,
     p.couple_id AS couple_id,
-    c.slug AS couple_slug,
+    -- Cast explícito: a coluna slug da tabela couples é varchar(100) e o
+    -- RETURNS TABLE declara text — Postgres exige tipo exato (42804).
+    c.slug::text AS couple_slug,
     c.couple_names AS couple_names,
     EXISTS (
       SELECT 1 FROM public.couples c2
@@ -511,12 +517,14 @@ $$;
 
 -- Reservas públicas (só item_key + guest_name — o convidado vê o que
 -- já foi reservado e pode cancelar a própria pelo nome)
+-- DROP antes do CREATE: evita 42804 se a assinatura antiga diferir.
+DROP FUNCTION IF EXISTS public.get_gift_reservations_public(uuid);
 CREATE OR REPLACE FUNCTION public.get_gift_reservations_public(p_couple_id uuid)
 RETURNS TABLE(item_key text, guest_name text)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT gr.item_key, gr.guest_name
+  SELECT gr.item_key::text, gr.guest_name::text
   FROM public.gift_reservations gr
   WHERE gr.couple_id = p_couple_id;
 $$;
