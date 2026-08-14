@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -17,16 +18,22 @@ import {
 /*
 Contexto de autenticação do casal.
 
-Controla a sessão do Supabase Auth e
-informa se o usuário logado é um dos
-administradores (e-mail na tabela
-admin_emails).
+Controla a sessão do Supabase Auth e informa:
+- session, user, authLoading
+- isAdmin (e-mail na tabela admin_emails)
+- coupleId (do JWT claim `couple_id` ou fallback)
+
+O coupleId vem PRIMEIRO do app_metadata do JWT (configurado pelo
+webhook da migration 006). Se o webhook não estiver ativo, cai para
+uma subquery no banco (current_user_couple_id).
 */
 
 const AuthContext = createContext({
   session: null,
+  user: null,
   isAdmin: false,
   authLoading: true,
+  coupleId: null,
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
@@ -49,6 +56,24 @@ export function AuthProvider({ children }) {
   // INITIAL_SESSION disparam em sequência).
   const lastCheckedEmail =
     useRef(null);
+
+  const [coupleId, setCoupleId] =
+    useState(null);
+
+
+  function extractCoupleId(user) {
+    // 1) Tenta o JWT claim (via webhook da migration 006)
+    const fromJwt =
+      user?.app_metadata?.couple_id;
+
+    if (fromJwt) {
+      return fromJwt;
+    }
+
+    // 2) Fallback: null (resolving no CoupleProvider
+    //    via current_user_couple_id() no banco)
+    return null;
+  }
 
 
   async function refreshAdmin(email) {
@@ -92,6 +117,29 @@ export function AuthProvider({ children }) {
   }
 
 
+  async function resolveCoupleId(user) {
+    const fromJwt = extractCoupleId(user);
+
+    if (fromJwt) {
+      setCoupleId(fromJwt);
+      return;
+    }
+
+    try {
+      const { data, error } =
+        await supabase.rpc(
+          "current_user_couple_id"
+        );
+
+      if (!error && data) {
+        setCoupleId(data);
+      }
+    } catch {
+      // silencioso: CoupleProvider trata o null
+    }
+  }
+
+
   useEffect(() => {
     let mounted = true;
 
@@ -106,9 +154,13 @@ export function AuthProvider({ children }) {
 
         setSession(data.session);
 
+        const user = data.session?.user ?? null;
+
         await refreshAdmin(
-          data.session?.user?.email
+          user?.email
         );
+
+        await resolveCoupleId(user);
       } catch (err) {
         console.error(
           "Erro ao restaurar sessão:",
@@ -132,9 +184,13 @@ export function AuthProvider({ children }) {
 
           setSession(newSession);
 
+          const user = newSession?.user ?? null;
+
           refreshAdmin(
-            newSession?.user?.email
+            user?.email
           );
+
+          resolveCoupleId(user);
         }
       );
 
@@ -156,9 +212,13 @@ export function AuthProvider({ children }) {
       throw error;
     }
 
+    const user = data.session?.user ?? null;
+
     await refreshAdmin(
-      data.session?.user?.email
+      user?.email
     );
+
+    await resolveCoupleId(user);
 
     return data.session;
   }
@@ -262,50 +322,70 @@ export function AuthProvider({ children }) {
 
     setIsAdmin(false);
     setSession(null);
+    setCoupleId(null);
   }
 
 
-  async function claimAdmin(
-    email = session?.user?.email
-  ) {
-    const { data, error } =
-      await supabase.rpc("claim_admin");
+  const claimAdmin = useCallback(
+    async (email = session?.user?.email) => {
+      const { data, error } =
+        await supabase.rpc(
+          "claim_admin"
+        );
 
-    if (error) {
-      console.error(
-        "Erro ao reivindicar admin:",
-        error
-      );
+      if (error) {
+        console.error(
+          "Erro ao reivindicar admin:",
+          error
+        );
+
+        return false;
+      }
+
+      if (data === true) {
+        // refreshAdmin inline (evita dep instável)
+        if (email) {
+          const {
+            data: adminData,
+            error: adminError,
+          } = await supabase.rpc(
+            "is_admin"
+          );
+
+          setIsAdmin(
+            !adminError &&
+              adminData === true
+          );
+        } else {
+          setIsAdmin(false);
+        }
+
+        return true;
+      }
 
       return false;
-    }
-
-    if (data === true) {
-      // Usa o e-mail passado por parâmetro (ou o
-      // atual): evita ler a session do closure,
-      // que pode estar desatualizada no fluxo de
-      // cadastro (login automático em andamento).
-      await refreshAdmin(email);
-
-      return true;
-    }
-
-    return false;
-  }
+    },
+    [session]
+  );
 
 
   const value = useMemo(
     () => ({
       session,
+      user: session?.user ?? null,
       isAdmin,
       authLoading,
+      coupleId,
       signIn,
       signUp,
       signOut,
       claimAdmin,
     }),
+    // claimAdmin é memoizado; signIn/signUp/signOut
+    // são recriadas a cada render e o provider só
+    // precisa reagir às mudanças de estado abaixo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, isAdmin, authLoading]
+    [session, isAdmin, authLoading, coupleId, claimAdmin]
   );
 
 

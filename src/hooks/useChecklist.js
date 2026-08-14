@@ -3,6 +3,7 @@
   useMemo,
   useState,
 } from "react";
+import { useCouple } from "../context/CoupleContext";
 
 import {
   loadChecklist,
@@ -14,6 +15,8 @@ import {
 
 /**
  * Hook compartilhado de checklist.
+ *
+ * Multi-casal: filtra pelo coupleId do CoupleContext.
  *
  * Centraliza o carregamento, marcação,
  * adição, remoção, estatísticas e busca
@@ -27,6 +30,8 @@ export function useChecklist(
   listType,
   initialData
 ) {
+  const { coupleId } = useCouple();
+
   const [categories, setCategories] =
     useState(initialData);
 
@@ -68,7 +73,10 @@ export function useChecklist(
         setError("");
 
         const databaseItems =
-          await loadChecklist(listType);
+          await loadChecklist(
+            listType,
+            coupleId
+          );
 
         const updatedCategories =
           initialData.map((category) => {
@@ -158,10 +166,8 @@ export function useChecklist(
 
     loadData();
 
-    // Dados iniciais são estáticos;
-    // não precisam ser re-executados.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listType]);
+  }, [listType, coupleId]);
 
 
   /*

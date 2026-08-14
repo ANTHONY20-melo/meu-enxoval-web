@@ -5,12 +5,19 @@ import {
 import { useAuth }
   from "../context/AuthContext";
 
+import { useCouple }
+  from "../context/CoupleContext";
+
 
 export default function MobileNav() {
   const {
     session,
     isAdmin,
   } = useAuth();
+
+  const {
+    couple,
+  } = useCouple();
 
   function getLinkClass({
     isActive,
@@ -44,20 +51,40 @@ export default function MobileNav() {
       </NavLink>
 
 
-      {/* ENXOVAL */}
+      {/* ENXOVAL (somente casal) */}
 
-      <NavLink
-        to="/enxoval"
-        className={getLinkClass}
-      >
-        <span className="mobile-bottom-icon">
-          🧺
-        </span>
+      {isAdmin && (
+        <NavLink
+          to="/enxoval"
+          className={getLinkClass}
+        >
+          <span className="mobile-bottom-icon">
+            🧺
+          </span>
 
-        <span>
-          Enxoval
-        </span>
-      </NavLink>
+          <span>
+            Enxoval
+          </span>
+        </NavLink>
+      )}
+
+
+      {/* MEU SITE (somente casal) */}
+
+      {isAdmin && couple?.slug && (
+        <NavLink
+          to={`/${couple.slug}`}
+          className={getLinkClass}
+        >
+          <span className="mobile-bottom-icon">
+            🌐
+          </span>
+
+          <span>
+            Site
+          </span>
+        </NavLink>
+      )}
 
 
       {/* CASAMENTO (somente casal) */}

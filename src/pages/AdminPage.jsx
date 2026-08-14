@@ -3,10 +3,22 @@ import {
   useState,
 } from "react";
 
-import { Link } from "react-router";
+import {
+  Link,
+  useNavigate,
+} from "react-router";
 
 import { useAuth }
   from "../context/AuthContext";
+
+import { useCouple }
+  from "../context/CoupleContext";
+
+import { couplesService }
+  from "../services/couples";
+
+import { generateSlug }
+  from "../types/couple";
 
 
 /**
@@ -16,6 +28,11 @@ import { useAuth }
  * casal crie a própria conta ou entre com
  * e-mail/senha. Os dois primeiros cadastros
  * viram administradores automaticamente.
+ *
+ * Também concentra a criação do site:
+ * se o admin ainda não tem casal, mostra o
+ * formulário "Criar meu site"; se já tem,
+ * mostra o link público para compartilhar.
  */
 export default function AdminPage() {
   const {
@@ -27,6 +44,13 @@ export default function AdminPage() {
     signOut,
     claimAdmin,
   } = useAuth();
+
+  const {
+    couple,
+    refreshCouple,
+  } = useCouple();
+
+  const navigate = useNavigate();
 
   const [mode, setMode] = useState(
     "login"
@@ -46,6 +70,25 @@ export default function AdminPage() {
 
   const [submitting, setSubmitting] =
     useState(false);
+
+  // Formulário de criação do site
+  const [coupleNoiva, setCoupleNoiva] =
+    useState("");
+
+  const [coupleNoivo, setCoupleNoivo] =
+    useState("");
+
+  const [coupleDate, setCoupleDate] =
+    useState("");
+
+  const [pix, setPix] =
+    useState("");
+
+  const [creating, setCreating] =
+    useState(false);
+
+  const [createError, setCreateError] =
+    useState("");
 
 
   useEffect(() => {
@@ -271,6 +314,82 @@ export default function AdminPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+
+  async function handleCreateSite(event) {
+    event.preventDefault();
+
+    if (creating) {
+      return;
+    }
+
+    const noiva = coupleNoiva.trim();
+    const noivo = coupleNoivo.trim();
+
+    if (!noiva || !noivo) {
+      setCreateError(
+        "Preencha o nome da noiva e do noivo."
+      );
+
+      return;
+    }
+
+    if (!coupleDate) {
+      setCreateError(
+        "Informe a data do casamento."
+      );
+
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setCreateError("");
+
+      const slug = generateSlug({
+        noiva,
+        noivo,
+      });
+
+      await couplesService.createFromTemplate({
+        slug,
+        coupleNames: { noiva, noivo },
+        weddingDate: coupleDate,
+        pixKey: pix.trim() || undefined,
+      });
+
+      await refreshCouple();
+
+      navigate("/dashboard");
+    } catch (err) {
+      console.error(
+        "Erro ao criar site:",
+        err
+      );
+
+      setCreateError(
+        friendlyCreateError(err)
+      );
+    } finally {
+      setCreating(false);
+    }
+  }
+
+
+  function friendlyCreateError(err) {
+    const message =
+      (err?.message || "")
+        .toLowerCase();
+
+    if (
+      message.includes("duplicate") ||
+      message.includes("slug")
+    ) {
+      return "Este endereço já está em uso. Tente nomes diferentes.";
+    }
+
+    return "Não foi possível criar o site. Tente novamente.";
   }
 
 
@@ -538,13 +657,148 @@ export default function AdminPage() {
               </button>
             )}
 
-            {isAdmin && (
-              <Link
-                className="admin-cta-button"
-                to="/orcamento"
-              >
-                Abrir orçamento →
-              </Link>
+            {isAdmin && !couple && (
+              <div className="admin-create-site">
+
+                <h3>
+                  🌐 Crie seu site de casamento
+                </h3>
+
+                <p>
+                  Seu site sai na hora: lista de
+                  presentes pronta, link público
+                  para os convidados e painel de
+                  reservas.
+                </p>
+
+                <form
+                  className="admin-form"
+                  onSubmit={handleCreateSite}
+                >
+
+                  <label className="admin-field">
+                    <span>Nome da noiva</span>
+
+                    <input
+                      type="text"
+                      value={coupleNoiva}
+                      placeholder="Ex: Ana"
+                      onChange={(event) =>
+                        setCoupleNoiva(
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Nome do noivo</span>
+
+                    <input
+                      type="text"
+                      value={coupleNoivo}
+                      placeholder="Ex: Pedro"
+                      onChange={(event) =>
+                        setCoupleNoivo(
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Data do casamento</span>
+
+                    <input
+                      type="date"
+                      value={coupleDate}
+                      onChange={(event) =>
+                        setCoupleDate(
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label className="admin-field">
+                    <span>
+                      Chave PIX (opcional)
+                    </span>
+
+                    <input
+                      type="text"
+                      value={pix}
+                      placeholder="Chave para contribuições"
+                      onChange={(event) =>
+                        setPix(
+                          event.target.value
+                        )
+                      }
+                    />
+                  </label>
+
+                  {createError && (
+                    <p className="admin-error">
+                      {createError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="admin-submit-button"
+                    disabled={creating}
+                  >
+                    {creating
+                      ? "Criando..."
+                      : "Criar meu site"}
+                  </button>
+
+                </form>
+
+              </div>
+            )}
+
+            {isAdmin && couple && (
+              <div className="admin-site-ready">
+
+                <h3>
+                  🌐 Seu site está no ar!
+                </h3>
+
+                <p>
+                  Compartilhe este link com os
+                  convidados:
+                </p>
+
+                <a
+                  className="admin-site-link"
+                  href={`/${couple.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {window.location.origin}
+                  /{couple.slug}
+                </a>
+
+                <div className="admin-site-actions">
+
+                  <Link
+                    className="admin-cta-button"
+                    to="/dashboard"
+                  >
+                    Abrir painel →
+                  </Link>
+
+                  <Link
+                    className="admin-cta-button"
+                    to="/enxoval"
+                  >
+                    Editar enxoval →
+                  </Link>
+
+                </div>
+
+              </div>
             )}
 
             <button

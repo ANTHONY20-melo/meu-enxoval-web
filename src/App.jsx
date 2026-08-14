@@ -6,6 +6,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useParams,
 } from "react-router";
 
 import Header from "./components/Header";
@@ -20,6 +21,11 @@ import "./App.css";
 Páginas carregadas sob demanda
 (code splitting por rota).
 */
+
+const Landing =
+  lazy(() =>
+    import("./pages/Landing")
+  );
 
 const Dashboard =
   lazy(() =>
@@ -61,6 +67,25 @@ const Admin =
     import("./pages/AdminPage")
   );
 
+const PublicSite =
+  lazy(() =>
+    import("./pages/PublicSite")
+  );
+
+
+// Redireciona /:slug/enxoval → /:slug (o enxoval
+// público do casal vive na própria raiz do slug)
+function SlugEnxovalRedirect() {
+  const { slug } = useParams();
+
+  return (
+    <Navigate
+      to={`/${slug}`}
+      replace
+    />
+  );
+}
+
 
 export default function App() {
   return (
@@ -84,32 +109,22 @@ export default function App() {
 
           <Routes>
 
+            {/*
+              Rotas fixas devem vir ANTES de /:slug
+              para não serem capturadas pelo parâmetro.
+              (React Router v6: matching é por ordem + specificity)
+            */}
+
+            {/* Landing pública do produto */}
+
             <Route
               path="/"
+              element={<Landing />}
+            />
+
+            <Route
+              path="/dashboard"
               element={<Dashboard />}
-            />
-
-            <Route
-              path="/enxoval"
-              element={<Home />}
-            />
-
-            <Route
-              path="/casamento"
-              element={
-                <AdminGuard>
-                  <Wedding />
-                </AdminGuard>
-              }
-            />
-
-            <Route
-              path="/orcamento"
-              element={
-                <AdminGuard>
-                  <Budget />
-                </AdminGuard>
-              }
             />
 
             <Route
@@ -130,6 +145,47 @@ export default function App() {
             <Route
               path="/cancel"
               element={<Cancel />}
+            />
+
+            {/* Área do casal (autenticado) */}
+
+            <Route
+              path="/enxoval"
+              element={
+                <AdminGuard>
+                  <Home />
+                </AdminGuard>
+              }
+            />
+
+            <Route
+              path="/casamento"
+              element={
+                <AdminGuard>
+                  <Wedding />
+                </AdminGuard>
+              }
+            />
+
+            <Route
+              path="/orcamento"
+              element={
+                <AdminGuard>
+                  <Budget />
+                </AdminGuard>
+              }
+            />
+
+            {/* Rotas multi-casal: página pública por slug */}
+
+            <Route
+              path="/:slug"
+              element={<PublicSite />}
+            />
+
+            <Route
+              path="/:slug/enxoval"
+              element={<SlugEnxovalRedirect />}
             />
 
             {/* ROTA NÃO ENCONTRADA */}

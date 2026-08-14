@@ -11,21 +11,26 @@ import {
   loadBudgetItems,
 } from "../services/budgetService";
 
-import { Link } from "react-router";
+import {
+  Link,
+  Navigate,
+} from "react-router";
 
 import { useAuth }
   from "../context/AuthContext";
+
+import { useCouple }
+  from "../context/CoupleContext";
 
 import "../App.css";
 
 
 /**
- * Página inicial.
+ * Painel do casal (rota /dashboard).
  *
- * Para visitantes (não logados) mostra
- * apenas o progresso público do enxoval.
- * Para o casal autenticado, mostra também
- * o planejamento do casamento e o orçamento.
+ * Requer login: visitantes são redirecionados
+ * para /admin. Mostra o progresso do enxoval,
+ * do casamento e do orçamento do casal logado.
  */
 export default function Dashboard() {
   const {
@@ -33,6 +38,10 @@ export default function Dashboard() {
     isAdmin,
     authLoading,
   } = useAuth();
+
+  const {
+    couple,
+  } = useCouple();
 
   const [loading, setLoading] =
     useState(true);
@@ -213,6 +222,56 @@ export default function Dashboard() {
           </div>
 
         </div>
+
+      </main>
+    );
+  }
+
+
+  // Visitante sem login → área do casal
+  if (!session) {
+    return (
+      <Navigate
+        to="/admin"
+        replace
+      />
+    );
+  }
+
+
+  // Logado mas ainda sem casal → criar site
+  if (session && isAdmin && !couple) {
+    return (
+      <main className="dashboard-page">
+
+        <section className="dashboard-welcome">
+
+          <div className="container">
+
+            <span className="checklist-label">
+              🌐 Comece aqui
+            </span>
+
+            <h1>
+              Seu site ainda não foi criado
+            </h1>
+
+            <p>
+              Crie seu site de casamento para
+              liberar o painel, o enxoval e o
+              link público dos convidados.
+            </p>
+
+            <Link
+              className="admin-cta-button"
+              to="/admin"
+            >
+              Criar meu site →
+            </Link>
+
+          </div>
+
+        </section>
 
       </main>
     );

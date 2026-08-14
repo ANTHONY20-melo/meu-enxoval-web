@@ -3,6 +3,8 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useParams } from "react-router";
+import { useCouple } from "../context/CoupleContext";
 
 import {
   loadGiftReservations,
@@ -15,18 +17,25 @@ import {
 /**
  * Hook de reservas de presentes.
  *
- * Carrega as reservas do enxoval e
- * expõe ações seguras (RPC):
+ * Carrega as reservas do ENXOVAL do casal atual
+ * (via slug na URL ou JWT claim) e expõe ações
+ * seguras (RPC):
  * - reserve(itemKey, guestName)
  * - cancel(itemKey, guestName)
  * - cancelAsAdmin(itemKey)
  *
- * A reserva fica disponível como um mapa
- * itemKey -> guestName.
+ * Multi-casal: usa coupleId do CoupleContext.
+ * Se não houver casal na sessão (sem login, sem
+ * slug), carrega apenas as reservas visíveis via
+ * política pública.
  */
 export function useGiftReservations(
   enabled = true
 ) {
+  const { coupleId } = useCouple();
+  const params = useParams();
+  const slugParam = params?.slug;
+
   const [reservations, setReservations] =
     useState([]);
 
@@ -46,7 +55,7 @@ export function useGiftReservations(
       setError("");
 
       const data =
-        await loadGiftReservations();
+        await loadGiftReservations(coupleId);
 
       setReservations(data);
     } catch (err) {
@@ -71,9 +80,8 @@ export function useGiftReservations(
     }
 
     load();
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
+  }, [enabled, coupleId, slugParam]);
 
 
   const reservationMap = useMemo(
@@ -102,6 +110,7 @@ export function useGiftReservations(
       const ok = await reserveGift({
         itemKey,
         guestName,
+        coupleId,
       });
 
       if (ok) {
@@ -137,6 +146,7 @@ export function useGiftReservations(
       const ok = await cancelGiftReservation({
         itemKey,
         guestName,
+        coupleId,
       });
 
       if (ok) {
@@ -168,7 +178,8 @@ export function useGiftReservations(
 
       const ok =
         await cancelGiftReservationAsAdmin(
-          itemKey
+          itemKey,
+          coupleId
         );
 
       if (ok) {

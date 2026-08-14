@@ -6,12 +6,19 @@ import {
 import { useAuth }
   from "../context/AuthContext";
 
+import { useCouple }
+  from "../context/CoupleContext";
+
 
 export default function Header() {
   const {
     session,
     isAdmin,
   } = useAuth();
+
+  const {
+    couple,
+  } = useCouple();
 
   function getNavLinkClass({
     isActive,
@@ -56,12 +63,14 @@ export default function Header() {
           </NavLink>
 
 
-          <NavLink
-            to="/enxoval"
-            className={getNavLinkClass}
-          >
-            🧺 Enxoval
-          </NavLink>
+          {isAdmin && (
+            <NavLink
+              to="/enxoval"
+              className={getNavLinkClass}
+            >
+              🧺 Enxoval
+            </NavLink>
+          )}
 
 
           {isAdmin && (
@@ -84,13 +93,19 @@ export default function Header() {
           )}
 
 
+          {isAdmin && couple?.slug && (
+            <NavLink
+              to={`/${couple.slug}`}
+              className={getNavLinkClass}
+            >
+              🌐 Meu site
+            </NavLink>
+          )}
+
+
           <Link
             to="/admin"
-            className={
-              session
-                ? "nav-link"
-                : "nav-link"
-            }
+            className="nav-link"
           >
             {session
               ? "👥 Casal"

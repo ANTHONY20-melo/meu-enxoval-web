@@ -16,6 +16,9 @@ import { CartProvider }
 import { AuthProvider }
   from "./context/AuthContext";
 
+import { CoupleProvider }
+  from "./context/CoupleContext.tsx";
+
 import "./index.css";
 
 
@@ -49,11 +52,13 @@ createRoot(
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
-            <Suspense
-              fallback={<PageLoader />}
-            >
-              <App />
-            </Suspense>
+            <CoupleProvider>
+              <Suspense
+                fallback={<PageLoader />}
+              >
+                <App />
+              </Suspense>
+            </CoupleProvider>
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>
