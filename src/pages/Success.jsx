@@ -24,7 +24,16 @@ export default function Success() {
     searchParams.get("status");
 
   useEffect(() => {
-    if (status !== "pending") {
+    // Limpa o carrinho apenas quando o pagamento
+    // foi concluído/processado. Em falha, mantém
+    // os itens para o usuário tentar de novo.
+    const failedStatuses = [
+      "failure",
+      "rejected",
+      "aborted"
+    ];
+
+    if (!failedStatuses.includes(status)) {
       clearCart();
     }
   }, [clearCart, status]);

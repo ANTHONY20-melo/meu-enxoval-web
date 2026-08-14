@@ -35,9 +35,11 @@ de segurança (Row Level Security). Execute no SQL Editor do Supabase:
 
 1. Acesse o painel do Supabase → projeto → **SQL Editor**
 2. Cole o conteúdo de `supabase/schema.sql` e clique em **Run**
-3. Crie as contas do casal em **Authentication → Users** (2 e-mails)
-4. Cada membro do casal entra em `/admin` e clica em
-   **"Tornar-me administrador"** (máximo 2)
+3. Cada membro do casal cria a própria conta na página **Área do casal**
+   (`/admin`) — os dois primeiros cadastros viram administradores
+   automaticamente (máx. 2). O cadastro passa pela API
+   (`POST /api/auth/register`), que cria o usuário com e-mail
+   confirmado e o registra na tabela `admin_emails`
 
 Com o RLS ativo:
 - **Público**: pode ler a lista e reservar presentes (via funções seguras)

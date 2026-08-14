@@ -3,10 +3,15 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 import { supabase } from "../services/supabase";
+
+import {
+  registerAdminAccount
+} from "../services/api";
 
 
 /*
@@ -39,10 +44,20 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] =
     useState(true);
 
+  // Evita consultar is_admin() repetidamente
+  // para o mesmo e-mail (bootstrap + evento
+  // INITIAL_SESSION disparam em sequência).
+  const lastCheckedEmail =
+    useRef(null);
+
 
   async function refreshAdmin(email) {
     if (!email) {
       setIsAdmin(false);
+      return;
+    }
+
+    if (lastCheckedEmail.current === email) {
       return;
     }
 
@@ -59,6 +74,11 @@ export function AuthProvider({ children }) {
         setIsAdmin(false);
         return;
       }
+
+      // Marca apenas APÓS o sucesso: se a RPC
+      // falhar (rede), o próximo chamador pode
+      // tentar de novo (o guard não foi armado).
+      lastCheckedEmail.current = email;
 
       setIsAdmin(data === true);
     } catch (err) {
@@ -147,52 +167,107 @@ export function AuthProvider({ children }) {
   /**
    * Cadastro do casal direto no site.
    *
-   * Com a confirmação de e-mail ativa no
-   * Supabase, retorna session = null e o
-   * usuário precisa confirmar o link antes
-   * do primeiro login. Se autoconfirm estiver
-   * ativo, retorna a sessão logada.
+   * 1ª tentativa: via API (conta já nasce com
+   * e-mail confirmado e como administrador).
+   * Fallback (API indisponível): cadastro nativo
+   * do Supabase + claim_admin quando autoconfirmar.
+   *
+   * Retorna { session, created, admin }.
    */
   async function signUp(
     email,
     password,
     fullName
   ) {
-    const { data, error } =
-      await supabase.auth.signUp({
+    try {
+      await registerAdminAccount(
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    const session = data.session || null;
-
-    if (session) {
-      await refreshAdmin(
-        session.user?.email
+        fullName
       );
-    }
 
-    return session;
+      // Conta criada pela API: já é admin.
+      // Faz o login automático.
+      const newSession = await signIn(
+        email,
+        password
+      );
+
+      return {
+        session: newSession,
+        created: true,
+        admin: true
+      };
+    } catch (err) {
+      const viaApi =
+        err?.message?.toLowerCase()?.includes(
+          "api"
+        ) ||
+        err?.message?.toLowerCase()?.includes(
+          "network"
+        ) ||
+        err?.message?.toLowerCase()?.includes(
+          "fetch"
+        ) ||
+        err?.message?.toLowerCase()?.includes(
+          "failed"
+        );
+
+      if (!viaApi) {
+        throw err;
+      }
+
+      // Fallback: cria direto no Supabase e tenta
+      // tornar-se administrador em seguida.
+      const { data, error } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const session = data.session || null;
+
+      let admin = false;
+
+      if (session) {
+        admin = await claimAdmin(
+          session.user?.email
+        );
+      }
+
+      return {
+        session,
+        created: true,
+        admin
+      };
+    }
   }
 
 
   async function signOut() {
     await supabase.auth.signOut();
+
+    // Limpa o dedupe para permitir nova verificação
+    // no próximo login com o mesmo e-mail.
+    lastCheckedEmail.current = null;
+
     setIsAdmin(false);
     setSession(null);
   }
 
 
-  async function claimAdmin() {
+  async function claimAdmin(
+    email = session?.user?.email
+  ) {
     const { data, error } =
       await supabase.rpc("claim_admin");
 
@@ -206,9 +281,11 @@ export function AuthProvider({ children }) {
     }
 
     if (data === true) {
-      await refreshAdmin(
-        session?.user?.email
-      );
+      // Usa o e-mail passado por parâmetro (ou o
+      // atual): evita ler a session do closure,
+      // que pode estar desatualizada no fluxo de
+      // cadastro (login automático em andamento).
+      await refreshAdmin(email);
 
       return true;
     }

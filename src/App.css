@@ -3682,3 +3682,22 @@ body {
 .admin-cta-button:hover {
   background: #b26b73;
 }
+
+.admin-toggle-button {
+  background: none;
+  border: none;
+  padding: 0;
+
+  color: #c98a92;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+
+  cursor: pointer;
+
+  transition: color 0.2s ease;
+}
+
+.admin-toggle-button:hover {
+  color: #b26b73;
+}

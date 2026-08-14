@@ -10,12 +10,12 @@ import { useAuth }
 
 
 /**
- * Área do casal (login/logout).
+ * Área do casal (login/cadastro/logout).
  *
  * Rota /admin. Permite que cada membro do
- * casal entre com e-mail/senha e, no
- * primeiro acesso, torne-se administrador
- * (máximo 2 e-mails).
+ * casal crie a própria conta ou entre com
+ * e-mail/senha. Os dois primeiros cadastros
+ * viram administradores automaticamente.
  */
 export default function AdminPage() {
   const {
@@ -31,7 +31,6 @@ export default function AdminPage() {
   const [mode, setMode] = useState(
     "login"
   );
-
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] =
@@ -160,7 +159,7 @@ export default function AdminPage() {
       setFormError("");
       setSuccessMessage("");
 
-      const session = await signUp(
+      const result = await signUp(
         normalizedEmail,
         password,
         normalizedName
@@ -169,8 +168,12 @@ export default function AdminPage() {
       setPassword("");
       setConfirmPassword("");
 
-      if (session) {
-        // Autoconfirm ativo: já entrou.
+      if (result.admin) {
+        setSuccessMessage(
+          "Conta criada! Você agora é um dos administradores."
+        );
+      } else if (result.session) {
+        // Autoconfirm ativo, mas sem admin (limite).
         setSuccessMessage(
           "Conta criada! Agora clique em \"Tornar-me administrador\" para liberar a área do casal."
         );
@@ -222,6 +225,13 @@ export default function AdminPage() {
       message.includes("valid email")
     ) {
       return "Digite um e-mail válido.";
+    }
+
+    if (
+      message.includes("já possui conta") ||
+      message.includes("limite de 2 administradores")
+    ) {
+      return message;
     }
 
     return "Não foi possível criar a conta. Tente novamente.";
@@ -287,12 +297,15 @@ export default function AdminPage() {
             </span>
 
             <h1>
-              Entre para gerenciar
+              {mode === "login"
+                ? "Entre para gerenciar"
+                : "Crie a conta do casal"}
             </h1>
 
             <p>
-              Esta área é privada. Use o e-mail
-              e a senha combinados.
+              {mode === "login"
+                ? "Esta área é privada. Use o e-mail e a senha combinados."
+                : "Os dois primeiros cadastros viram administradores automaticamente."}
             </p>
           </div>
         </section>
@@ -440,8 +453,6 @@ export default function AdminPage() {
                     : "Criar conta"}
               </button>
 
-            </form>
-
             <p className="admin-hint">
               {mode === "login"
                 ? "Ainda não tem conta? Use a aba \"Criar conta\" para cadastrar o e-mail do casal."
@@ -542,6 +553,7 @@ export default function AdminPage() {
               onClick={async () => {
                 await signOut();
                 setEmail("");
+                setMode("login");
               }}
             >
               Sair

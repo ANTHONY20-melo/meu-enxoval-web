@@ -89,6 +89,8 @@ export default function ChecklistPage({
     cancel,
     cancelAsAdmin,
     loading: reservationsLoading,
+    error: reservationError,
+    setError: setReservationError,
   } = reservations;
 
   const [reservingItem, setReservingItem] =
@@ -331,6 +333,24 @@ export default function ChecklistPage({
                 aria-label="Fechar mensagem de erro"
                 onClick={() =>
                   setError("")
+                }
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {reservationError && (
+            <div className="checklist-error">
+              <span>
+                {reservationError}
+              </span>
+
+              <button
+                type="button"
+                aria-label="Fechar mensagem de erro de reserva"
+                onClick={() =>
+                  setReservationError("")
                 }
               >
                 ×
