@@ -332,9 +332,10 @@ AS $$
 $$;
 
 -- Cria casal a partir do template (clona checklist + budget do casal
--- principal). SOMENTE super admin: o dono da plataforma cria o site
--- do casal e define o owner (dono). Gera code de 6 chars (compatível
--- com o app mobile) e vincula o profile do dono.
+-- principal). SELF-SERVICE: qualquer usuário autenticado cria o PRÓPRIO
+-- site (p_owner_user_id omisso ou igual a auth.uid()). O super admin
+-- (dono da plataforma) pode criar o site DE OUTRO usuário. Gera code de
+-- 6 chars (compatível com o app mobile) e vincula o profile do dono.
 CREATE OR REPLACE FUNCTION public.create_couple_from_template(
   p_slug varchar,
   p_couple_names jsonb,
@@ -351,8 +352,11 @@ DECLARE
   v_owner uuid := COALESCE(p_owner_user_id, auth.uid());
   v_template uuid;
 BEGIN
-  IF NOT public.is_super_admin() THEN
-    RAISE EXCEPTION 'sem permissão: apenas o administrador cria sites';
+  -- Para SI mesmo: qualquer autenticado. Para OUTRO usuário: só super admin.
+  IF p_owner_user_id IS NOT NULL
+     AND p_owner_user_id <> auth.uid()
+     AND NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'sem permissão: apenas o administrador cria sites para outros usuários';
   END IF;
 
   IF p_slug IS NULL OR trim(p_slug) = '' THEN

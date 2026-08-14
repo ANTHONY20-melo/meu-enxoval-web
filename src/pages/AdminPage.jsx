@@ -28,13 +28,14 @@ import { generateSlug }
  *
  * Rota /admin.
  *
- * - Sem sessão: login/cadastro. A conta NÃO nasce admin:
- *   o dono da plataforma libera o acesso por casal.
- * - Logado sem permissão: mensagem de aprovação pendente.
+ * - Sem sessão: login/cadastro. Qualquer conta criada
+ *   pode criar o PRÓPRIO site de casamento (self-service).
+ * - Logado sem casal: formulário "Criar meu site" — o
+ *   primeiro que criar o site vira o dono (admin) do casal.
  * - Admin (dono de um casal): mostra o link público do site.
  * - Super admin (Anthony): painel de gestão — lista quem
- *   acessa o site, cria o site do casal e concede/revoga
- *   a permissão de admin (dono) por casal.
+ *   acessa a plataforma, cria o site DE OUTRO usuário e
+ *   concede/revoga a permissão de admin (dono) por casal.
  */
 export default function AdminPage() {
   const {
@@ -262,7 +263,7 @@ export default function AdminPage() {
 
       if (result.session) {
         setSuccessMessage(
-          "Conta criada! A permissão de acesso será liberada pelo administrador da plataforma."
+          "Conta criada! Agora crie o site do casal com nomes e data."
         );
       } else {
         // Confirmação de e-mail ativa.
@@ -427,6 +428,73 @@ export default function AdminPage() {
   }
 
 
+  // SELF-SERVICE: o próprio usuário logado cria o site dele.
+  // (ownerUserId fica SEM valor → o RPC usa auth.uid()).
+  async function handleCreateOwnSite(event) {
+    event.preventDefault();
+
+    if (creating) {
+      return;
+    }
+
+    const noiva = coupleNoiva.trim();
+    const noivo = coupleNoivo.trim();
+
+    if (!noiva || !noivo) {
+      setCreateError(
+        "Preencha o nome da noiva e do noivo."
+      );
+
+      return;
+    }
+
+    if (!coupleDate) {
+      setCreateError(
+        "Informe a data do casamento."
+      );
+
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setCreateError("");
+      setPanelMessage("");
+
+      const slug = generateSlug({
+        noiva,
+        noivo,
+      });
+
+      await couplesService.createFromTemplate({
+        slug,
+        coupleNames: { noiva, noivo },
+        weddingDate: coupleDate,
+        pixKey: pix.trim() || undefined,
+      });
+
+      // O site nasce com o dono = usuário logado:
+      // o contexto carrega o casal na hora.
+      await refreshCouple();
+
+      setSuccessMessage(
+        "Site criado! Agora é só compartilhar o link com os convidados."
+      );
+    } catch (err) {
+      console.error(
+        "Erro ao criar seu site:",
+        err
+      );
+
+      setCreateError(
+        friendlyCreateError(err)
+      );
+    } finally {
+      setCreating(false);
+    }
+  }
+
+
   async function handleSetOwner(userId, coupleId) {
     if (submitting) {
       return;
@@ -520,7 +588,7 @@ export default function AdminPage() {
             <p>
               {mode === "login"
                 ? "Esta área é privada. Use o e-mail e a senha combinados."
-                : "Crie a conta com o e-mail do casal. Um administrador liberará o acesso ao site."}
+                : "Crie a conta com o e-mail do casal e depois crie o site na hora — sem esperar aprovação."}
             </p>
           </div>
         </section>
@@ -672,7 +740,7 @@ export default function AdminPage() {
             <p className="admin-hint">
               {mode === "login"
                 ? "Ainda não tem conta? Use a aba \"Criar conta\" para cadastrar o e-mail do casal."
-                : "Depois do cadastro, o administrador da plataforma libera o acesso ao site do casal."}
+                : "Depois do cadastro, você mesmo cria o site do casal em segundos — sem esperar ninguém."}
             </p>
 
           </div>
@@ -962,7 +1030,8 @@ export default function AdminPage() {
   }
 
 
-  // Usuário logado sem permissão: aguardando aprovação
+  // Usuário logado sem casal: cria o PRÓPRIO site (self-service).
+  // O primeiro que criar o site vira o dono (admin) do casal.
   if (!isAdmin || !couple) {
     return (
       <main className="admin-page">
@@ -977,35 +1046,137 @@ export default function AdminPage() {
             </h1>
 
             <p>
-              Seu acesso ainda não foi liberado.
-              O administrador da plataforma cria o
-              site do casal e concede a permissão de
-              admin. Assim que liberar, você entra
-              aqui e gerencia tudo.
+              Crie o site do casal agora mesmo:
+              informe os nomes e a data — a lista de
+              enxoval, o checklist e o orçamento saem
+              prontos. Você é o administrador do site.
             </p>
           </div>
         </section>
 
         <section className="admin-section">
           <div className="container">
-            <div className="admin-actions">
-              <p className="admin-hint">
-                ⏳ Aguardando liberação do administrador...
-              </p>
 
-              <button
-                type="button"
-                className="admin-logout-button"
-                disabled={submitting}
-                onClick={async () => {
-                  await signOut();
-                  setEmail("");
-                  setMode("login");
-                }}
+            {successMessage && (
+              <p className="admin-success">
+                {successMessage}
+              </p>
+            )}
+
+            <div className="admin-create-site">
+              <h3>
+                🌐 Criar meu site de casamento
+              </h3>
+
+              <form
+                className="admin-form"
+                onSubmit={handleCreateOwnSite}
               >
-                Sair
-              </button>
+
+                <div className="admin-form-row">
+                  <label className="admin-field">
+                    <span>Nome da noiva</span>
+
+                    <input
+                      type="text"
+                      value={coupleNoiva}
+                      autoComplete="off"
+                      placeholder="Ex: Ana"
+                      onChange={(event) => {
+                        setCoupleNoiva(
+                          event.target.value
+                        );
+                        setCreateError("");
+                      }}
+                    />
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Nome do noivo</span>
+
+                    <input
+                      type="text"
+                      value={coupleNoivo}
+                      autoComplete="off"
+                      placeholder="Ex: Pedro"
+                      onChange={(event) => {
+                        setCoupleNoivo(
+                          event.target.value
+                        );
+                        setCreateError("");
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <label className="admin-field">
+                  <span>Data do casamento</span>
+
+                  <input
+                    type="date"
+                    value={coupleDate}
+                    onChange={(event) => {
+                      setCoupleDate(
+                        event.target.value
+                      );
+                      setCreateError("");
+                    }}
+                  />
+                </label>
+
+                <label className="admin-field">
+                  <span>
+                    Chave PIX (opcional)
+                  </span>
+
+                  <input
+                    type="text"
+                    value={pix}
+                    placeholder="Chave para contribuições"
+                    onChange={(event) =>
+                      setPix(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+
+                {createError && (
+                  <p className="admin-error">
+                    {createError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="admin-submit-button"
+                  disabled={creating}
+                >
+                  {creating
+                    ? "Criando site..."
+                    : "Criar meu site grátis"}
+                </button>
+
+                <p className="admin-hint">
+                  Você poderá editar a lista de presentes,
+                  o checklist e o orçamento no painel.
+                </p>
+              </form>
             </div>
+
+            <button
+              type="button"
+              className="admin-logout-button"
+              disabled={submitting}
+              onClick={async () => {
+                await signOut();
+                setEmail("");
+                setMode("login");
+              }}
+            >
+              Sair
+            </button>
+
           </div>
         </section>
       </main>
