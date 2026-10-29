@@ -18,6 +18,9 @@ import ChecklistPage
 import { enxovalConfig }
   from "../data/checklistConfigs";
 
+import { CONVITE_URL }
+  from "../constants/convite";
+
 
 /**
  * Página pública de um casal (rota "/:slug").
@@ -166,7 +169,7 @@ export default function PublicSite() {
             <span className="public-hero-names">
               {noiva}
               <span className="public-hero-amp">
-                &amp;
+                &
               </span>
               {noivo}
             </span>
@@ -184,7 +187,20 @@ export default function PublicSite() {
               reservá-lo. 💝
             </p>
 
+            {/* CAMINHO DE VOLTA AO CONVITE */}
+
+            <p className="public-back-invite">
+              <a
+                href={CONVITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                ← Voltar para o convite
+              </a>
+            </p>
+
           </div>
+
 
 
           {/* PIX */}

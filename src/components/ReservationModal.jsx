@@ -3,6 +3,9 @@ import {
   useState,
 } from "react";
 
+import { CONVITE_URL }
+  from "../constants/convite";
+
 
 /**
  * Modal de reserva de presente.
@@ -143,6 +146,20 @@ export default function ReservationModal({
                 ? "Para desfazer sua reserva, toque no botão abaixo."
                 : "Escolha outro item da lista para presentear. 😊"}
             </p>
+
+            {/* CAMINHO DE VOLTA AO CONVITE */}
+
+            {!isAdmin && (
+              <p className="reservation-back-invite">
+                <a
+                  href={CONVITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ← Voltar para o convite
+                </a>
+              </p>
+            )}
           </div>
         )}
 
@@ -196,6 +213,18 @@ export default function ReservationModal({
                 {error}
               </p>
             )}
+
+            {/* CAMINHO DE VOLTA AO CONVITE */}
+
+            <p className="reservation-back-invite">
+              <a
+                href={CONVITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                ← Voltar para o convite
+              </a>
+            </p>
 
             <div className="confirm-actions">
 
